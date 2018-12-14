@@ -140,6 +140,15 @@ namespace gazebo
     protected: virtual void PublishCameraInfo();
 
     private: event::ConnectionPtr load_connection_;
+
+    /// \brief noise parameters
+    private: std::string noise_type_;
+    private: bool enable_noise_;
+    private: double noise_mean_;
+    private: double noise_std_dev_;
+    private: float* noise_image_;
+    private: void CreateNoiseImage();
+    private: std::normal_distribution<double> distribution_;
   };
 
 }

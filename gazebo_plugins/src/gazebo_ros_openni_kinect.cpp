@@ -36,6 +36,9 @@
 
 #include <tf/tf.h>
 
+#include <random>
+#include <chrono>
+
 namespace gazebo
 {
 // Register this plugin with the simulator
@@ -102,6 +105,21 @@ void GazeboRosOpenniKinect::Load(sensors::SensorPtr _parent, sdf::ElementPtr _sd
     this->point_cloud_cutoff_max_ = 5.0;
   else
     this->point_cloud_cutoff_max_ = _sdf->GetElement("pointCloudCutoffMax")->Get<double>();
+
+  if (!_sdf->HasElement("noiseType"))
+    this->noise_type_ = "none";
+  else
+    this->noise_type_ = _sdf->GetElement("noiseType")->Get<std::string>();
+
+  if (!_sdf->HasElement("noiseMean"))
+    this->noise_mean_ = 0.0;
+  else
+    this->noise_mean_ = _sdf->GetElement("noiseMean")->Get<double>();
+
+  if (!_sdf->HasElement("noiseStdDev"))
+    this->noise_std_dev_ = 0.0;
+  else
+    this->noise_std_dev_ = _sdf->GetElement("noiseStdDev")->Get<double>();
 
   load_connection_ = GazeboRosCameraUtils::OnLoad(boost::bind(&GazeboRosOpenniKinect::Advertise, this));
   GazeboRosCameraUtils::Load(_parent, _sdf);
@@ -199,6 +217,17 @@ void GazeboRosOpenniKinect::OnNewDepthFrame(const float *_image,
     }
     else
     {
+
+      if (this->noise_std_dev_ != 0.0 || this->noise_mean_ != 0.0)
+      {
+        this->enable_noise_ = true;
+        this->CreateNoiseImage();
+      }
+      else
+      {
+        this->enable_noise_ = false;
+      }
+
       if (this->point_cloud_connect_count_ > 0)
         this->FillPointdCloud(_image);
 
@@ -214,6 +243,38 @@ void GazeboRosOpenniKinect::OnNewDepthFrame(const float *_image,
       this->parentSensor->SetActive(true);
   }
   PublishCameraInfo();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Create Noise image
+void GazeboRosOpenniKinect::CreateNoiseImage()
+{
+  this->lock_.lock();
+  int index = 0;
+
+  int rows_arg = this->width_;
+  int cols_arg = this->height_;
+
+  // initiate random normal distribution engine for noise generation
+  unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+  std::default_random_engine generator (seed);
+  std::normal_distribution<double> distribution (this->noise_mean_,this->noise_std_dev_);
+
+  this->noise_image_ = new float[this->width_ * this->height * 3];
+
+  // convert depth to point cloud
+  for (uint32_t j = 0; j < rows_arg; j++)
+  {
+    for (uint32_t i = 0; i < cols_arg; i++)
+    {
+      for (uint32_t h = 0; h < 3; h++)
+      {
+        float noise = distribution(generator);
+        this->noise_image_[index++] = noise;
+      }
+    }
+  }
+  this->lock_.unlock();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -343,9 +404,24 @@ bool GazeboRosOpenniKinect::FillPointCloudHelper(
         // hardcoded rotation rpy(-M_PI/2, 0, -M_PI/2) is built-in
         // to urdf, where the *_optical_frame should have above relative
         // rotation from the physical camera *_frame
-        *iter_x = depth * tan(yAngle);
-        *iter_y = depth * tan(pAngle);
-        *iter_z = depth;
+        //*iter_x = depth * tan(yAngle);
+        //*iter_y = depth * tan(pAngle);
+        if(this->enable_noise_)
+        {
+          float noise_z = this->noise_image_[index];
+          float noise_x = this->noise_image_[this->width * this->height + index];
+          float noise_y = this->noise_image_[this->width * this->height * 2 + index];
+
+          *iter_x = depth * tan(yAngle) + noise_x;
+          *iter_y = depth * tan(pAngle) + noise_y;
+          *iter_z = depth + noise_z;
+        }
+        else
+        {
+          *iter_x = depth * tan(yAngle);
+          *iter_y = depth * tan(pAngle);
+          *iter_z = depth;
+        }
       }
       else //point in the unseeable range
       {
@@ -416,7 +492,15 @@ bool GazeboRosOpenniKinect::FillDepthImageHelper(
       if (depth > this->point_cloud_cutoff_ &&
           depth < this->point_cloud_cutoff_max_)
       {
-        dest[i + j * cols_arg] = depth;
+        if(this->enable_noise_)
+        {
+          float noise = this->noise_image_[index];
+          dest[i + j * cols_arg] = depth + noise;
+        }
+        else
+        {
+          dest[i + j * cols_arg] = depth;
+        }
       }
       else //point in the unseeable range
       {
