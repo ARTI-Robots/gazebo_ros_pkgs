@@ -115,6 +115,7 @@ catkin_package(
   gazebo_ros_planar_move
   gazebo_ros_range
   gazebo_ros_vacuum_gripper
+  gazebo_ros_rtk_gps
 
   CATKIN_DEPENDS
   message_runtime
@@ -221,6 +222,9 @@ target_link_libraries(gazebo_ros_block_laser RayPlugin ${catkin_LIBRARIES})
 
 add_library(gazebo_ros_p3d src/gazebo_ros_p3d.cpp)
 target_link_libraries(gazebo_ros_p3d ${catkin_LIBRARIES} ${Boost_LIBRARIES})
+
+add_library(gazebo_ros_rtk_gps src/gazebo_ros_rtk_gps.cpp)
+target_link_libraries(gazebo_ros_rtk_gps ${catkin_LIBRARIES} ${Boost_LIBRARIES})
 
 add_library(gazebo_ros_imu src/gazebo_ros_imu.cpp)
 target_link_libraries(gazebo_ros_imu ${catkin_LIBRARIES} ${Boost_LIBRARIES})
