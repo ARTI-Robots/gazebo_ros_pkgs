@@ -49,6 +49,7 @@
 
 namespace gazebo
 {
+
   class GazeboRosRTK : public ModelPlugin
   {
     /// \brief Constructor
@@ -121,6 +122,23 @@ namespace gazebo
     private: double gaussian_noise_twist_y_;
     private: double gaussian_noise_twist_z_;
 
+    struct rectangle
+    {
+      double xa = 0.0;
+      double ya = 0.0;
+      double xb = 0.0;
+      double yb = 0.0;
+      double xc = 0.0;
+      double yc = 0.0;
+      double xd = 0.0;
+      double yd = 0.0;
+      double area_rect = 0.0;
+      double add_noise = 0.0;
+      bool gps_available = true;
+    };
+
+    private: std::vector<struct rectangle> issue_areas;
+
     /// \brief Gaussian noise generator
     private: double GaussianKernel(double mu, double sigma);
 
@@ -138,6 +156,12 @@ namespace gazebo
 
     // ros publish multi queue, prevents publish() blocking
     private: PubMultiQueue pmq;
+
+
+    /// \brief topic name
+    private: std::string issue_config_;
+    private: void getGPSIssueAreas(std::string file);
+    void calculateAreaIssue(double pos_x, double pos_y, bool *gps_available, double *add_noise);
   };
 }
 #endif

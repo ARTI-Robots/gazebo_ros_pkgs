@@ -21,6 +21,8 @@
 
 #include "gazebo_plugins/gazebo_ros_rtk_gps.h"
 
+#include <yaml-cpp/yaml.h>
+
 namespace gazebo
 {
 GZ_REGISTER_MODEL_PLUGIN(GazeboRosRTK);
@@ -172,6 +174,14 @@ void GazeboRosRTK::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf)
   else
     this->update_rate_ = _sdf->GetElement("updateRate")->Get<double>();
 
+  if (!_sdf->HasElement("issueConfig"))
+  {
+    ROS_DEBUG_NAMED("rtk", "gazebo_ros_rtk_gps plugin missing <issueConfig>, defaults to ''");
+    this->issue_config_ = "";
+  }
+  else
+    this->issue_config_ = _sdf->GetElement("issueConfig")->Get<std::string>();
+
   // Make sure the ROS node for Gazebo has already been initialized
   if (!ros::isInitialized())
   {
@@ -254,6 +264,9 @@ void GazeboRosRTK::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf)
   // simulation iteration.
   this->update_connection_ = event::Events::ConnectWorldUpdateBegin(
       boost::bind(&GazeboRosRTK::UpdateChild, this));
+
+  // Load GPS issue areas
+  this->getGPSIssueAreas("");
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -354,13 +367,23 @@ void GazeboRosRTK::UpdateChild()
         this->last_frame_vpos_ = frame_vpos;
         this->last_frame_veul_ = frame_veul;
 
+
+
+        // Check if current position is inside an issue-area and if so, add noise or don't publish message in case of no GPS.
+        bool gps_available = true;
+        double add_noise = 0.0;
+        calculateAreaIssue(pose.Pos().X(), pose.Pos().Y(), &gps_available, &add_noise);
+        //ROS_ERROR_STREAM("#######################################################");
+        //ROS_ERROR_STREAM("################ GPS-available = " << gps_available);
+        //ROS_ERROR_STREAM("################     add_noise = " << add_noise);
+
         // Fill out messages
         this->pose_msg_.pose.pose.position.x    = pose.Pos().X() +
-          this->GaussianKernel(0, this->gaussian_noise_pos_x_);
+          this->GaussianKernel(0, this->gaussian_noise_pos_x_ + add_noise);
         this->pose_msg_.pose.pose.position.y    = pose.Pos().Y() +
-          this->GaussianKernel(0, this->gaussian_noise_pos_y_);
+          this->GaussianKernel(0, this->gaussian_noise_pos_y_ + add_noise);
         this->pose_msg_.pose.pose.position.z    = pose.Pos().Z() +
-          this->GaussianKernel(0, this->gaussian_noise_pos_z_);
+          this->GaussianKernel(0, this->gaussian_noise_pos_z_ + add_noise);
 
         this->pose_msg_.pose.pose.orientation.x = pose.Rot().X() +
           this->GaussianKernel(0, this->gaussian_noise_orientation_);
@@ -372,11 +395,11 @@ void GazeboRosRTK::UpdateChild()
           this->GaussianKernel(0, this->gaussian_noise_orientation_);
 
         this->pose_msg_.twist.twist.linear.x  = vpos.X() +
-          this->GaussianKernel(0, this->gaussian_noise_twist_x_);
+          this->GaussianKernel(0, this->gaussian_noise_twist_x_ + add_noise);
         this->pose_msg_.twist.twist.linear.y  = vpos.Y() +
-          this->GaussianKernel(0, this->gaussian_noise_twist_y_);
+          this->GaussianKernel(0, this->gaussian_noise_twist_y_ + add_noise);
         this->pose_msg_.twist.twist.linear.z  = vpos.Z() +
-          this->GaussianKernel(0, this->gaussian_noise_twist_z_);
+          this->GaussianKernel(0, this->gaussian_noise_twist_z_ + add_noise);
         // pass euler angular rates
         this->pose_msg_.twist.twist.angular.x = veul.X() +
           this->GaussianKernel(0, this->gaussian_noise_twist_x_);
@@ -401,8 +424,9 @@ void GazeboRosRTK::UpdateChild()
         this->pose_msg_.twist.covariance[28] = this->gaussian_noise_twist_y_ * this->gaussian_noise_twist_y_;
         this->pose_msg_.twist.covariance[35] = this->gaussian_noise_twist_z_ * this->gaussian_noise_twist_z_;
 
-        // publish to ros
-        this->pub_Queue->push(this->pose_msg_, this->pub_);
+        // publish to ros in case GPS is available
+        if(gps_available == true)
+          this->pub_Queue->push(this->pose_msg_, this->pub_);
       }
 
       this->lock.unlock();
@@ -448,4 +472,121 @@ void GazeboRosRTK::RTKQueueThread()
     this->rtk_queue_.callAvailable(ros::WallDuration(timeout));
   }
 }
+
+////////////////////////////////////////////////////////////////////////////////
+void GazeboRosRTK::getGPSIssueAreas(std::string file)
+{
+  if(this->issue_config_ == "")
+    return;
+
+  ROS_INFO_STREAM("ROS-RTK-GPS: Parsing file containing GPS-issue-areas: " <<  this->issue_config_);
+
+  try
+  {
+    YAML::Node yaml = YAML::LoadFile(this->issue_config_);
+    for (const YAML::Node& area : yaml["areas"])
+    {
+      double xa = area["p1"]["x"].as<double>();
+      double ya = area["p1"]["y"].as<double>();
+      double xb = area["p2"]["x"].as<double>();
+      double yb = area["p2"]["y"].as<double>();
+      double xc = area["p3"]["x"].as<double>();
+      double yc = area["p3"]["y"].as<double>();
+      double xd = area["p4"]["x"].as<double>();
+      double yd = area["p4"]["y"].as<double>();
+      double add_noise = area["additional_gaussian_noise"].as<double>();
+      bool gps_available = area["gps_available"].as<bool>();
+
+      struct rectangle rect;
+      rect.xa = xa;
+      rect.ya = ya;
+      rect.xb = xb;
+      rect.yb = yb;
+      rect.xc = xc;
+      rect.yc = yc;
+      rect.xd = xd;
+      rect.yd = yd;
+
+      // Algorithm see: https://martin-thoma.com/how-to-check-if-a-point-is-inside-a-rectangle/
+      // Calculate area from a rectangle-shaped polygon as described in https://www.mathopenref.com/coordpolygonarea.html
+      double area_rect = 0.5 * std::abs((xa*yb - ya*xb) + (xb*yc - yb*xc) + (xc*yd - yc*xd) + (xd*ya - yd*xa));
+      // Set area, noise and gps-flag
+      rect.area_rect = area_rect;
+      rect.add_noise = add_noise;
+      rect.gps_available = gps_available;
+      this->issue_areas.push_back(rect);
+    }
+  }
+  catch (YAML::BadFile&)
+  {
+    ROS_ERROR_STREAM("File: '" << this->issue_config_ << "' not found");
+  }
+  catch (YAML::Exception& ex)
+  {
+    ROS_ERROR_STREAM("RTK-GPS-issue-config file can not be parsed: " << ex.what());
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+void GazeboRosRTK::calculateAreaIssue(double pos_x, double pos_y, bool *gps_available, double *add_noise)
+{
+  // Algorithm see: https://martin-thoma.com/how-to-check-if-a-point-is-inside-a-rectangle/
+  *gps_available = true;
+  *add_noise = 0.0;
+  // Go through all GPS-issue-areas
+  for(int i=0; i < this->issue_areas.size(); i++)
+  {
+    // Get corner-points of issue-rectangle
+    double xa = this->issue_areas[i].xa;
+    double ya = this->issue_areas[i].ya;
+    double xb = this->issue_areas[i].xb;
+    double yb = this->issue_areas[i].yb;
+    double xc = this->issue_areas[i].xc;
+    double yc = this->issue_areas[i].yc;
+    double xd = this->issue_areas[i].xd;
+    double yd = this->issue_areas[i].yd;
+
+    // Calculate triangles using 2 corners and the current position
+    double area_triangle_abp = 0.5*abs((xa*(yb-pos_y) + xb*(pos_y-ya) + pos_x*(ya-yb)));
+    double area_triangle_bcp = 0.5*abs((xb*(yc-pos_y) + xc*(pos_y-yb) + pos_x*(yb-yc)));
+
+    double area_triangle_cdp = 0.5*abs((xc*(yd-pos_y) + xd*(pos_y-yc) + pos_x*(yc-yd)));
+    double area_triangle_dap = 0.5*abs((xd*(ya-pos_y) + xa*(pos_y-yd) + pos_x*(yd-ya)));
+
+    // Sum up all rectangles
+    double area_combined = area_triangle_abp + area_triangle_bcp + area_triangle_cdp + area_triangle_dap;
+
+    /*ROS_INFO_STREAM("  AREA number " << i << " | pos_x = " << pos_x << " - pos_y = " << pos_y);
+    ROS_INFO_STREAM("  rect-area     = " << this->issue_areas[i].area_rect);
+    ROS_INFO_STREAM("  area_combined = " << area_combined);
+    ROS_INFO_STREAM("  area_abp = " << area_triangle_abp);
+    ROS_INFO_STREAM("  area_bcp = " << area_triangle_bcp);
+    ROS_INFO_STREAM("  area_cdp = " << area_triangle_cdp);
+    ROS_INFO_STREAM("  area_dap = " << area_triangle_dap);*/
+
+    // If the combined area is larger than the area of the rectangle, then the point is outside of the rectangle
+    bool point_inside = true;
+    if(area_combined > this->issue_areas[i].area_rect)
+    {
+      point_inside = false;
+      continue;
+    }
+
+    // If the current position is inside an issue-area, check if GPS is available at that area. If not, return no GPS.
+    if(this->issue_areas[i].gps_available == false)
+    {
+      *add_noise = 0.0;
+      *gps_available = false;
+      return;
+    }
+
+    // If GPS is available, set the additional noise of this area. In case of overlapping areas, the one with the biggest noise is chosen.
+    if(this->issue_areas[i].add_noise > *add_noise)
+    {
+      *add_noise = this->issue_areas[i].add_noise;
+      *gps_available = true;
+    }
+  }
+}
+
 }

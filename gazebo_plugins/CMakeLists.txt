@@ -36,6 +36,7 @@ if (PKG_CONFIG_FOUND)
   pkg_check_modules(OGRE OGRE)
   pkg_check_modules(OGRE-Terrain OGRE-Terrain)
   pkg_check_modules(OGRE-Paging OGRE-Paging)
+  pkg_check_modules(yaml-cpp REQUIRED yaml-cpp>=0.5)
 else()
   message(FATAL_ERROR "pkg-config is required; please install it")
 endif()
@@ -63,6 +64,7 @@ include_directories(include
   ${OGRE_INCLUDE_DIRS}
   ${OGRE-Terrain_INCLUDE_DIRS}
   ${OGRE-Paging_INCLUDE_DIRS}
+  ${yaml-cpp_INCLUDE_DIRS}
 )
 
 link_directories(
@@ -224,7 +226,7 @@ add_library(gazebo_ros_p3d src/gazebo_ros_p3d.cpp)
 target_link_libraries(gazebo_ros_p3d ${catkin_LIBRARIES} ${Boost_LIBRARIES})
 
 add_library(gazebo_ros_rtk_gps src/gazebo_ros_rtk_gps.cpp)
-target_link_libraries(gazebo_ros_rtk_gps ${catkin_LIBRARIES} ${Boost_LIBRARIES})
+target_link_libraries(gazebo_ros_rtk_gps ${catkin_LIBRARIES} ${Boost_LIBRARIES} yaml-cpp)
 
 add_library(gazebo_ros_imu src/gazebo_ros_imu.cpp)
 target_link_libraries(gazebo_ros_imu ${catkin_LIBRARIES} ${Boost_LIBRARIES})
