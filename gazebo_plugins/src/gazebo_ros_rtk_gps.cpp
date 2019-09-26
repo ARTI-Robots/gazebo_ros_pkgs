@@ -93,21 +93,22 @@ void GazeboRosRTK::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf)
   else
     this->frame_name_ = _sdf->GetElement("frameName")->Get<std::string>();
 
-  if (!_sdf->HasElement("xyzOffset"))
+  if (!_sdf->HasElement("baseStationPose"))
   {
-    ROS_DEBUG_NAMED("rtk", "gazebo_ros_rtk_gps plugin missing <xyzOffset>, defaults to 0s");
+    ROS_DEBUG_NAMED("rtk", "gazebo_ros_rtk_gps plugin missing <baseStationPose>, defaults to 0s");
     this->offset_.Pos() = ignition::math::Vector3d(0, 0, 0);
-  }
-  else
-    this->offset_.Pos() = _sdf->GetElement("xyzOffset")->Get<ignition::math::Vector3d>();
-
-  if (!_sdf->HasElement("rpyOffset"))
-  {
-    ROS_DEBUG_NAMED("rtk", "gazebo_ros_rtk_gps plugin missing <rpyOffset>, defaults to 0s");
     this->offset_.Rot() = ignition::math::Quaterniond(ignition::math::Vector3d(0, 0, 0));
   }
   else
-    this->offset_.Rot() = ignition::math::Quaterniond(_sdf->GetElement("rpyOffset")->Get<ignition::math::Vector3d>());
+  {
+    ignition::math::Pose3d pose = _sdf->GetElement("baseStationPose")->Get<ignition::math::Pose3d>();
+    this->offset_.Pos() = pose.Pos();
+    this->offset_.Rot() = pose.Rot();
+    // Rotate the position of the simulated base reference station
+    //ignition::math::Quaterniond rot(pose.Rot().W(), pose.Rot().X(), pose.Rot().Y(), pose.Rot().Z());
+    //this->offset_ = this->offset_.RotatePositionAboutOrigin(rot);
+  }
+
 
   if (!_sdf->HasElement("gaussianNoisePosX"))
   {
@@ -349,12 +350,11 @@ void GazeboRosRTK::UpdateChild()
           veul = frame_pose.Rot().RotateVector(veul - frame_veul);
         }
 
-        // Apply Constant Offsets
-        // apply xyz offsets and get position and rotation components
-        pose.Pos() = pose.Pos() + this->offset_.Pos();
-        // apply rpy offsets
-        pose.Rot() = this->offset_.Rot()*pose.Rot();
-        pose.Rot().Normalize();
+        // Apply Constant Offsets to simulate base reference station at that position
+        pose.Pos() = pose.Pos() - this->offset_.Pos();
+        // Rotate the position of the simulated base reference station
+        ignition::math::Quaterniond rot(this->offset_.Rot().W(), this->offset_.Rot().X(), this->offset_.Rot().Y(), this->offset_.Rot().Z());
+        pose = pose.RotatePositionAboutOrigin(rot);
 
         // compute accelerations (not used)
         this->apos_ = (this->last_vpos_ - vpos) / tmp_dt;
