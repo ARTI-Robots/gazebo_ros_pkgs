@@ -14,4 +14,8 @@
 # OSX Files
 .DS_Store
 
+# CLion files
+.idea/
+cmake-build-debug/
+
 CATKIN_IGNORE

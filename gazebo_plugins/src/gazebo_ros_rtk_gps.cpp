@@ -95,18 +95,11 @@ void GazeboRosRTK::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf)
 
   if (!_sdf->HasElement("baseStationPose"))
   {
-    ROS_DEBUG_NAMED("rtk", "gazebo_ros_rtk_gps plugin missing <baseStationPose>, defaults to 0s");
-    this->offset_.Pos() = ignition::math::Vector3d(0, 0, 0);
-    this->offset_.Rot() = ignition::math::Quaterniond(ignition::math::Vector3d(0, 0, 0));
+    ROS_DEBUG_NAMED("rtk", "gazebo_ros_rtk_gps plugin missing <baseStationPose>, defaults to origin");
   }
   else
   {
-    ignition::math::Pose3d pose = _sdf->GetElement("baseStationPose")->Get<ignition::math::Pose3d>();
-    this->offset_.Pos() = pose.Pos();
-    this->offset_.Rot() = pose.Rot();
-    // Rotate the position of the simulated base reference station
-    //ignition::math::Quaterniond rot(pose.Rot().W(), pose.Rot().X(), pose.Rot().Y(), pose.Rot().Z());
-    //this->offset_ = this->offset_.RotatePositionAboutOrigin(rot);
+    this->offset_ = _sdf->GetElement("baseStationPose")->Get<ignition::math::Pose3d>();
   }
 
 
@@ -351,10 +344,9 @@ void GazeboRosRTK::UpdateChild()
         }
 
         // Apply Constant Offsets to simulate base reference station at that position
-        pose.Pos() = pose.Pos() - this->offset_.Pos();
-        // Rotate the position of the simulated base reference station
-        ignition::math::Quaterniond rot(this->offset_.Rot().W(), this->offset_.Rot().X(), this->offset_.Rot().Y(), this->offset_.Rot().Z());
-        pose = pose.RotatePositionAboutOrigin(rot);
+        pose -= offset_;
+        vpos = offset_.Rot().RotateVectorReverse(vpos);
+        veul = offset_.Rot().RotateVectorReverse(veul);
 
         // compute accelerations (not used)
         this->apos_ = (this->last_vpos_ - vpos) / tmp_dt;
