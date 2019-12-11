@@ -402,16 +402,16 @@ void GazeboRosRTK::UpdateChild()
 
         // fill in covariance matrix
         /// @todo: let user set separate linear and angular covariance values.
-        this->pose_msg_.pose.covariance[0] = this->gaussian_noise_pos_x_ * this->gaussian_noise_pos_x_;
-        this->pose_msg_.pose.covariance[7] = this->gaussian_noise_pos_y_ * this->gaussian_noise_pos_y_;
-        this->pose_msg_.pose.covariance[14] = this->gaussian_noise_pos_z_ * this->gaussian_noise_pos_z_;
+        this->pose_msg_.pose.covariance[0] = std::pow(this->gaussian_noise_pos_x_ + add_noise, 2.);
+        this->pose_msg_.pose.covariance[7] = std::pow(this->gaussian_noise_pos_y_ + add_noise, 2.);
+        this->pose_msg_.pose.covariance[14] = std::pow(this->gaussian_noise_pos_z_ + add_noise, 2.);
         this->pose_msg_.pose.covariance[21] = this->gaussian_noise_orientation_ * this->gaussian_noise_orientation_;
         this->pose_msg_.pose.covariance[28] = this->gaussian_noise_orientation_ * this->gaussian_noise_orientation_;
         this->pose_msg_.pose.covariance[35] = this->gaussian_noise_orientation_ * this->gaussian_noise_orientation_;
 
-        this->pose_msg_.twist.covariance[0] = this->gaussian_noise_twist_x_ * this->gaussian_noise_twist_x_;
-        this->pose_msg_.twist.covariance[7] = this->gaussian_noise_twist_y_ * this->gaussian_noise_twist_y_;
-        this->pose_msg_.twist.covariance[14] = this->gaussian_noise_twist_z_ * this->gaussian_noise_twist_z_;
+        this->pose_msg_.twist.covariance[0] = std::pow(this->gaussian_noise_twist_x_ + add_noise, 2.);
+        this->pose_msg_.twist.covariance[7] = std::pow(this->gaussian_noise_twist_y_ + add_noise, 2.);
+        this->pose_msg_.twist.covariance[14] = std::pow(this->gaussian_noise_twist_z_ + add_noise, 2.);
         this->pose_msg_.twist.covariance[21] = this->gaussian_noise_twist_x_ * this->gaussian_noise_twist_x_;
         this->pose_msg_.twist.covariance[28] = this->gaussian_noise_twist_y_ * this->gaussian_noise_twist_y_;
         this->pose_msg_.twist.covariance[35] = this->gaussian_noise_twist_z_ * this->gaussian_noise_twist_z_;
