@@ -85,6 +85,11 @@ void GazeboRosRTK::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf)
   else
     this->topic_name_ = _sdf->GetElement("topicName")->Get<std::string>();
 
+  if (_sdf->HasElement("topicNameGroundTruth"))
+  {
+    ground_truth_topic_name_ = _sdf->GetElement("topicNameGroundTruth")->Get<std::string>();
+  }
+
   if (!_sdf->HasElement("frameName"))
   {
     ROS_DEBUG_NAMED("rtk", "gazebo_ros_rtk_gps plugin missing <frameName>, defaults to world");
@@ -201,6 +206,12 @@ void GazeboRosRTK::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf)
       this->rosnode_->advertise<nav_msgs::Odometry>(this->topic_name_, 1);
   }
 
+  if (ground_truth_topic_name_ != "")
+  {
+    this->pub_Queue = this->pmq.addPub<nav_msgs::Odometry>();
+    pub_ground_truth_ = rosnode_->advertise<nav_msgs::Odometry>(ground_truth_topic_name_, 1);
+  }
+
 #if GAZEBO_MAJOR_VERSION >= 8
   this->last_time_ = this->world_->SimTime();
 #else
@@ -298,11 +309,19 @@ void GazeboRosRTK::UpdateChild()
       if (this->topic_name_ != "")
       {
         // copy data into pose message
+        this->ground_truth_pose_msg_.header.frame_id = this->tf_frame_name_;
+        this->ground_truth_pose_msg_.header.stamp.sec = cur_time.sec;
+        this->ground_truth_pose_msg_.header.stamp.nsec = cur_time.nsec;
+
+        this->ground_truth_pose_msg_.child_frame_id = this->link_name_;
+
         this->pose_msg_.header.frame_id = this->tf_frame_name_;
         this->pose_msg_.header.stamp.sec = cur_time.sec;
         this->pose_msg_.header.stamp.nsec = cur_time.nsec;
 
         this->pose_msg_.child_frame_id = this->link_name_;
+
+
 
         ignition::math::Pose3d pose, frame_pose;
         ignition::math::Vector3d frame_vpos;
@@ -347,6 +366,39 @@ void GazeboRosRTK::UpdateChild()
         pose -= offset_;
         vpos = offset_.Rot().RotateVectorReverse(vpos);
         veul = offset_.Rot().RotateVectorReverse(veul);
+
+        // Fill out messages ground truth message
+        ground_truth_pose_msg_.pose.pose.position.x    = pose.Pos().X();
+        ground_truth_pose_msg_.pose.pose.position.y    = pose.Pos().Y();
+        ground_truth_pose_msg_.pose.pose.position.z    = pose.Pos().Z();
+
+        ground_truth_pose_msg_.pose.pose.orientation.x = pose.Rot().X();
+        ground_truth_pose_msg_.pose.pose.orientation.y = pose.Rot().Y();
+        ground_truth_pose_msg_.pose.pose.orientation.z = pose.Rot().Z();
+        ground_truth_pose_msg_.pose.pose.orientation.w = pose.Rot().W();
+
+        ground_truth_pose_msg_.twist.twist.linear.x  = vpos.X();
+        ground_truth_pose_msg_.twist.twist.linear.y  = vpos.Y();
+        ground_truth_pose_msg_.twist.twist.linear.z  = vpos.Z();
+        // pass euler angular rates
+        ground_truth_pose_msg_.twist.twist.angular.x = veul.X();
+        ground_truth_pose_msg_.twist.twist.angular.y = veul.Y();
+        ground_truth_pose_msg_.twist.twist.angular.z = veul.Z();
+
+        // fill in covariance matrix
+        ground_truth_pose_msg_.pose.covariance[0] = 0.;
+        ground_truth_pose_msg_.pose.covariance[7] = 0.;
+        ground_truth_pose_msg_.pose.covariance[14] = 0.;
+        ground_truth_pose_msg_.pose.covariance[21] = 0.;
+        ground_truth_pose_msg_.pose.covariance[28] = 0.;
+        ground_truth_pose_msg_.pose.covariance[35] = 0.;
+
+        ground_truth_pose_msg_.twist.covariance[0] = 0.;
+        ground_truth_pose_msg_.twist.covariance[7] = 0.;
+        ground_truth_pose_msg_.twist.covariance[14] = 0.;
+        ground_truth_pose_msg_.twist.covariance[21] = 0.;
+        ground_truth_pose_msg_.twist.covariance[28] = 0.;
+        ground_truth_pose_msg_.twist.covariance[35] = 0.;
 
         // compute accelerations (not used)
         this->apos_ = (this->last_vpos_ - vpos) / tmp_dt;
@@ -419,6 +471,11 @@ void GazeboRosRTK::UpdateChild()
         // publish to ros in case GPS is available
         if(gps_available == true)
           this->pub_Queue->push(this->pose_msg_, this->pub_);
+
+        if (pub_ground_truth_ && (pub_ground_truth_.getNumSubscribers() > 0))
+        {
+          pub_Queue->push(ground_truth_pose_msg_, pub_ground_truth_);
+        }
       }
 
       this->lock.unlock();

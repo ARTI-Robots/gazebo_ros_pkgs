@@ -77,16 +77,19 @@ namespace gazebo
     /// \brief pointer to ros node
     private: ros::NodeHandle* rosnode_;
     private: ros::Publisher pub_;
+    private: ros::Publisher pub_ground_truth_;
     private: PubQueue<nav_msgs::Odometry>::Ptr pub_Queue;
 
     /// \brief ros message
     private: nav_msgs::Odometry pose_msg_;
+    private: nav_msgs::Odometry ground_truth_pose_msg_;
 
     /// \brief store bodyname
     private: std::string link_name_;
 
     /// \brief topic name
     private: std::string topic_name_;
+    private: std::string ground_truth_topic_name_;
 
     /// \brief frame transform name, should match link name
     /// FIXME: extract link name directly?
