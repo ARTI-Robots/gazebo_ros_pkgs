@@ -107,6 +107,14 @@ void GazeboRosRTK::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf)
     this->offset_ = _sdf->GetElement("baseStationPose")->Get<ignition::math::Pose3d>();
   }
 
+  if (_sdf->HasElement("xyzOffset"))
+  {
+    this->antenna_offset_ = _sdf->GetElement("xyzOffset")->Get<ignition::math::Vector3d>();
+  }
+  else
+  {
+    this->antenna_offset_.Set(0., 0., 0.);
+  }
 
   if (!_sdf->HasElement("gaussianNoisePosX"))
   {
@@ -272,6 +280,8 @@ void GazeboRosRTK::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf)
 
   // Load GPS issue areas
   this->getGPSIssueAreas("");
+
+  _sdf->PrintValues("");
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -364,6 +374,8 @@ void GazeboRosRTK::UpdateChild()
 
         // Apply Constant Offsets to simulate base reference station at that position
         pose -= offset_;
+        pose.Pos() -= pose.Rot() * this->antenna_offset_;
+
         vpos = offset_.Rot().RotateVectorReverse(vpos);
         veul = offset_.Rot().RotateVectorReverse(veul);
 
