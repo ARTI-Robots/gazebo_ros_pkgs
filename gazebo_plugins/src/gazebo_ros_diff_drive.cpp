@@ -146,8 +146,10 @@ void GazeboRosDiffDrive::Load ( physics::ModelPtr _parent, sdf::ElementPtr _sdf 
     wheel_speed_instr_[RIGHT] = 0;
     wheel_speed_instr_[LEFT] = 0;
 
-    x_ = 0;
-    rot_ = 0;
+    double delay;
+    gazebo_ros_->getParameter<double> ( delay, "delay", 0.0);
+    delay_time_ = common::Time(delay);
+    ROS_INFO_STREAM("dealy is set to: " << delay_time_);
     alive_ = true;
 
 
@@ -196,8 +198,8 @@ void GazeboRosDiffDrive::Reset()
   pose_encoder_.x = 0;
   pose_encoder_.y = 0;
   pose_encoder_.theta = 0;
-  x_ = 0;
-  rot_ = 0;
+  while (!command_queue_.empty())
+    command_queue_.pop();
   joints_[LEFT]->SetParam ( "fmax", 0, wheel_torque );
   joints_[RIGHT]->SetParam ( "fmax", 0, wheel_torque );
 }
@@ -325,8 +327,38 @@ void GazeboRosDiffDrive::getWheelVelocities()
 {
     boost::mutex::scoped_lock scoped_lock ( lock );
 
-    double vr = x_;
-    double va = rot_;
+#if GAZEBO_MAJOR_VERSION >= 8
+    common::Time current_time = parent->GetWorld()->SimTime();
+#else
+    common::Time current_time = parent->GetWorld()->GetSimTime();
+#endif
+
+    common::Time time_to_process = current_time + delay_time_;
+    double vr = 0.;
+    double va = 0.;
+
+    while (!command_queue_.empty())
+    {
+      std::pair<common::Time, geometry_msgs::Twist> current_entry = command_queue_.front();
+      if (current_entry.first <= time_to_process)
+      {
+        vr = current_entry.second.linear.x;
+        va = current_entry.second.angular.z;
+
+        if (command_queue_.size() > 1)
+        {
+          command_queue_.pop();
+        }
+        else
+        {
+          break;
+        }
+      }
+      else
+      {
+        break;
+      }
+    }
 
     if(legacy_mode_)
     {
@@ -343,8 +375,15 @@ void GazeboRosDiffDrive::getWheelVelocities()
 void GazeboRosDiffDrive::cmdVelCallback ( const geometry_msgs::Twist::ConstPtr& cmd_msg )
 {
     boost::mutex::scoped_lock scoped_lock ( lock );
-    x_ = cmd_msg->linear.x;
-    rot_ = cmd_msg->angular.z;
+
+#if GAZEBO_MAJOR_VERSION >= 8
+    common::Time current_time = parent->GetWorld()->SimTime();
+#else
+    common::Time current_time = parent->GetWorld()->GetSimTime();
+#endif
+
+    std::pair<common::Time, geometry_msgs::Twist> new_command = std::make_pair(current_time, *cmd_msg);
+    command_queue_.push(new_command);
 }
 
 void GazeboRosDiffDrive::QueueThread()

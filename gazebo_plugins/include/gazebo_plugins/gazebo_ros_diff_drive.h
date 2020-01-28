@@ -65,6 +65,8 @@
 #include <boost/thread.hpp>
 #include <boost/bind.hpp>
 
+#include <queue>
+
 namespace gazebo {
 
   class Joint;
@@ -103,7 +105,7 @@ namespace gazebo {
       double wheel_diameter_;
       double wheel_torque;
       double wheel_speed_[2];
-	  double wheel_accel;
+	    double wheel_accel;
       double wheel_speed_instr_[2];
 
       std::vector<physics::JointPtr> joints_;
@@ -134,8 +136,8 @@ namespace gazebo {
       // DiffDrive stuff
       void cmdVelCallback(const geometry_msgs::Twist::ConstPtr& cmd_msg);
 
-      double x_;
-      double rot_;
+      std::queue<std::pair<common::Time, geometry_msgs::Twist>> command_queue_;
+      common::Time delay_time_;
       bool alive_;
 
       // Update Rate
