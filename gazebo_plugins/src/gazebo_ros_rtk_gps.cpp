@@ -280,8 +280,6 @@ void GazeboRosRTK::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf)
 
   // Load GPS issue areas
   this->getGPSIssueAreas("");
-
-  _sdf->PrintValues("");
 }
 
 ////////////////////////////////////////////////////////////////////////////////

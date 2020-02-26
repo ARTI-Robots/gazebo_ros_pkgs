@@ -157,7 +157,7 @@ void GazeboRosDiffDrive::Load ( physics::ModelPtr _parent, sdf::ElementPtr _sdf 
     double delay;
     gazebo_ros_->getParameter<double> ( delay, "delay", 0.0);
     delay_time_ = common::Time(delay);
-    ROS_INFO_STREAM("dealy is set to: " << delay_time_);
+    ROS_INFO_STREAM_NAMED("diff_drive", gazebo_ros_->info() << ": delay is set to " << delay_time_.Double());
     alive_ = true;
 
 
