@@ -118,6 +118,7 @@ catkin_package(
   gazebo_ros_range
   gazebo_ros_vacuum_gripper
   gazebo_ros_rtk_gps
+  gazebo_ros_ground_wire
 
   CATKIN_DEPENDS
   message_runtime
@@ -227,6 +228,9 @@ target_link_libraries(gazebo_ros_p3d ${catkin_LIBRARIES} ${Boost_LIBRARIES})
 
 add_library(gazebo_ros_rtk_gps src/gazebo_ros_rtk_gps.cpp)
 target_link_libraries(gazebo_ros_rtk_gps ${catkin_LIBRARIES} ${Boost_LIBRARIES} yaml-cpp)
+
+add_library(gazebo_ros_ground_wire src/gazebo_ros_ground_wire.cpp)
+target_link_libraries(gazebo_ros_ground_wire ${catkin_LIBRARIES} ${Boost_LIBRARIES} yaml-cpp)
 
 add_library(gazebo_ros_imu src/gazebo_ros_imu.cpp)
 target_link_libraries(gazebo_ros_imu ${catkin_LIBRARIES} ${Boost_LIBRARIES})
