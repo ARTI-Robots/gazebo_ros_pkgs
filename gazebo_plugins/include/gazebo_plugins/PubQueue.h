@@ -37,7 +37,7 @@ class PubMessagePair
     T msg_;
     /// \brief The publisher to use to publish the message.
     ros::Publisher pub_;
-    PubMessagePair(T& msg, ros::Publisher& pub) :
+    PubMessagePair(const T& msg, ros::Publisher& pub) :
       msg_(msg), pub_(pub) {}
 };
 
@@ -70,7 +70,7 @@ class PubQueue
     /// \brief Push a new message onto the queue.
     /// \param[in] msg The outgoing message
     /// \param[in] pub The ROS publisher to use to publish the message
-    void push(T& msg, ros::Publisher& pub)
+    void push(const T& msg, ros::Publisher& pub)
     {
       boost::shared_ptr<PubMessagePair<T> > el(new PubMessagePair<T>(msg, pub));
       boost::mutex::scoped_lock lock(*queue_lock_);

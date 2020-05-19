@@ -46,6 +46,7 @@
 #include <gazebo/common/Events.hh>
 
 #include <gazebo_plugins/PubQueue.h>
+#include <queue>
 
 namespace gazebo
 {
@@ -81,7 +82,7 @@ namespace gazebo
     private: PubQueue<nav_msgs::Odometry>::Ptr pub_Queue;
 
     /// \brief ros message
-    private: nav_msgs::Odometry pose_msg_;
+    private: std::queue<std::pair<bool, nav_msgs::Odometry>> pose_msgs_;
     private: nav_msgs::Odometry ground_truth_pose_msg_;
 
     /// \brief store bodyname
@@ -166,6 +167,8 @@ namespace gazebo
     private: std::string issue_config_;
     private: void getGPSIssueAreas(std::string file);
     void calculateAreaIssue(double pos_x, double pos_y, bool *gps_available, double *add_noise);
+    size_t maximum_queue_size_;
+
   };
 }
 #endif

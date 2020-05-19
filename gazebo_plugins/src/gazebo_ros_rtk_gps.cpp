@@ -189,6 +189,14 @@ void GazeboRosRTK::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf)
   else
     this->issue_config_ = _sdf->GetElement("issueConfig")->Get<std::string>();
 
+  if (!_sdf->HasElement("maximumQueueSize"))
+  {
+    ROS_DEBUG_NAMED("rtk", "gazebo_ros_rtk_gps plugin missing <issueConfig>, defaults to ''");
+    this->maximum_queue_size_ = 1;
+  }
+  else
+    this->maximum_queue_size_ = _sdf->GetElement("maximumQueueSize")->Get<size_t>();
+
   // Make sure the ROS node for Gazebo has already been initialized
   if (!ros::isInitialized())
   {
@@ -323,11 +331,13 @@ void GazeboRosRTK::UpdateChild()
 
         this->ground_truth_pose_msg_.child_frame_id = this->link_name_;
 
-        this->pose_msg_.header.frame_id = this->tf_frame_name_;
-        this->pose_msg_.header.stamp.sec = cur_time.sec;
-        this->pose_msg_.header.stamp.nsec = cur_time.nsec;
+        nav_msgs::Odometry pose_msg;
 
-        this->pose_msg_.child_frame_id = this->link_name_;
+        pose_msg.header.frame_id = this->tf_frame_name_;
+        pose_msg.header.stamp.sec = cur_time.sec;
+        pose_msg.header.stamp.nsec = cur_time.nsec;
+
+        pose_msg.child_frame_id = this->link_name_;
 
 
 
@@ -432,55 +442,64 @@ void GazeboRosRTK::UpdateChild()
         //ROS_ERROR_STREAM("################     add_noise = " << add_noise);
 
         // Fill out messages
-        this->pose_msg_.pose.pose.position.x    = pose.Pos().X() +
+        pose_msg.pose.pose.position.x    = pose.Pos().X() +
           this->GaussianKernel(0, this->gaussian_noise_pos_x_ + add_noise);
-        this->pose_msg_.pose.pose.position.y    = pose.Pos().Y() +
+        pose_msg.pose.pose.position.y    = pose.Pos().Y() +
           this->GaussianKernel(0, this->gaussian_noise_pos_y_ + add_noise);
-        this->pose_msg_.pose.pose.position.z    = pose.Pos().Z() +
+        pose_msg.pose.pose.position.z    = pose.Pos().Z() +
           this->GaussianKernel(0, this->gaussian_noise_pos_z_ + add_noise);
 
-        this->pose_msg_.pose.pose.orientation.x = pose.Rot().X() +
+        pose_msg.pose.pose.orientation.x = pose.Rot().X() +
           this->GaussianKernel(0, this->gaussian_noise_orientation_);
-        this->pose_msg_.pose.pose.orientation.y = pose.Rot().Y() +
+        pose_msg.pose.pose.orientation.y = pose.Rot().Y() +
           this->GaussianKernel(0, this->gaussian_noise_orientation_);
-        this->pose_msg_.pose.pose.orientation.z = pose.Rot().Z() +
+        pose_msg.pose.pose.orientation.z = pose.Rot().Z() +
           this->GaussianKernel(0, this->gaussian_noise_orientation_);
-        this->pose_msg_.pose.pose.orientation.w = pose.Rot().W() +
+        pose_msg.pose.pose.orientation.w = pose.Rot().W() +
           this->GaussianKernel(0, this->gaussian_noise_orientation_);
 
-        this->pose_msg_.twist.twist.linear.x  = vpos.X() +
+        pose_msg.twist.twist.linear.x  = vpos.X() +
           this->GaussianKernel(0, this->gaussian_noise_twist_x_ + add_noise);
-        this->pose_msg_.twist.twist.linear.y  = vpos.Y() +
+        pose_msg.twist.twist.linear.y  = vpos.Y() +
           this->GaussianKernel(0, this->gaussian_noise_twist_y_ + add_noise);
-        this->pose_msg_.twist.twist.linear.z  = vpos.Z() +
+        pose_msg.twist.twist.linear.z  = vpos.Z() +
           this->GaussianKernel(0, this->gaussian_noise_twist_z_ + add_noise);
         // pass euler angular rates
-        this->pose_msg_.twist.twist.angular.x = veul.X() +
+        pose_msg.twist.twist.angular.x = veul.X() +
           this->GaussianKernel(0, this->gaussian_noise_twist_x_);
-        this->pose_msg_.twist.twist.angular.y = veul.Y() +
+        pose_msg.twist.twist.angular.y = veul.Y() +
           this->GaussianKernel(0, this->gaussian_noise_twist_y_);
-        this->pose_msg_.twist.twist.angular.z = veul.Z() +
+        pose_msg.twist.twist.angular.z = veul.Z() +
           this->GaussianKernel(0, this->gaussian_noise_twist_z_);
 
         // fill in covariance matrix
         /// @todo: let user set separate linear and angular covariance values.
-        this->pose_msg_.pose.covariance[0] = std::pow(this->gaussian_noise_pos_x_ + add_noise, 2.) * 1000.;
-        this->pose_msg_.pose.covariance[7] = std::pow(this->gaussian_noise_pos_y_ + add_noise, 2.) * 1000.;
-        this->pose_msg_.pose.covariance[14] = std::pow(this->gaussian_noise_pos_z_ + add_noise, 2.) * 1000.;
-        this->pose_msg_.pose.covariance[21] = this->gaussian_noise_orientation_ * this->gaussian_noise_orientation_ * 1000.;
-        this->pose_msg_.pose.covariance[28] = this->gaussian_noise_orientation_ * this->gaussian_noise_orientation_ * 1000.;
-        this->pose_msg_.pose.covariance[35] = this->gaussian_noise_orientation_ * this->gaussian_noise_orientation_ * 1000.;
+        pose_msg.pose.covariance[0] = std::pow(this->gaussian_noise_pos_x_ + add_noise, 2.) * 1000.;
+        pose_msg.pose.covariance[7] = std::pow(this->gaussian_noise_pos_y_ + add_noise, 2.) * 1000.;
+        pose_msg.pose.covariance[14] = std::pow(this->gaussian_noise_pos_z_ + add_noise, 2.) * 1000.;
+        pose_msg.pose.covariance[21] = this->gaussian_noise_orientation_ * this->gaussian_noise_orientation_ * 1000.;
+        pose_msg.pose.covariance[28] = this->gaussian_noise_orientation_ * this->gaussian_noise_orientation_ * 1000.;
+        pose_msg.pose.covariance[35] = this->gaussian_noise_orientation_ * this->gaussian_noise_orientation_ * 1000.;
 
-        this->pose_msg_.twist.covariance[0] = std::pow(this->gaussian_noise_twist_x_ + add_noise, 2.) * 1000.;
-        this->pose_msg_.twist.covariance[7] = std::pow(this->gaussian_noise_twist_y_ + add_noise, 2.) * 1000.;
-        this->pose_msg_.twist.covariance[14] = std::pow(this->gaussian_noise_twist_z_ + add_noise, 2.) * 1000.;
-        this->pose_msg_.twist.covariance[21] = this->gaussian_noise_twist_x_ * this->gaussian_noise_twist_x_ * 1000.;
-        this->pose_msg_.twist.covariance[28] = this->gaussian_noise_twist_y_ * this->gaussian_noise_twist_y_ * 1000.;
-        this->pose_msg_.twist.covariance[35] = this->gaussian_noise_twist_z_ * this->gaussian_noise_twist_z_ * 1000.;
+        pose_msg.twist.covariance[0] = std::pow(this->gaussian_noise_twist_x_ + add_noise, 2.) * 1000.;
+        pose_msg.twist.covariance[7] = std::pow(this->gaussian_noise_twist_y_ + add_noise, 2.) * 1000.;
+        pose_msg.twist.covariance[14] = std::pow(this->gaussian_noise_twist_z_ + add_noise, 2.) * 1000.;
+        pose_msg.twist.covariance[21] = this->gaussian_noise_twist_x_ * this->gaussian_noise_twist_x_ * 1000.;
+        pose_msg.twist.covariance[28] = this->gaussian_noise_twist_y_ * this->gaussian_noise_twist_y_ * 1000.;
+        pose_msg.twist.covariance[35] = this->gaussian_noise_twist_z_ * this->gaussian_noise_twist_z_ * 1000.;
 
+        pose_msgs_.push(std::make_pair(gps_available, pose_msg));
         // publish to ros in case GPS is available
-        if(gps_available == true)
-          this->pub_Queue->push(this->pose_msg_, this->pub_);
+        while (pose_msgs_.size() >= maximum_queue_size_)
+        {
+          const std::pair<bool, nav_msgs::Odometry> msg = pose_msgs_.front();
+          pose_msgs_.pop();
+
+          if (msg.first)
+          {
+            this->pub_Queue->push(msg.second, this->pub_);
+          }
+        }
 
         if (pub_ground_truth_ && (pub_ground_truth_.getNumSubscribers() > 0))
         {
