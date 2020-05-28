@@ -107,9 +107,8 @@ namespace gazebo
     private: std::string frame_name_;
     private: std::string tf_frame_name_;
 
-    /// \brief allow specifying constant xyz and rpy offsets
+    /// \brief RTK base position offset from the gazebo coordinates (ground wire coordinates should be in RTK frame)
     private: ignition::math::Pose3d offset_;
-    private: ignition::math::Vector3d antenna_offset_;
 
     /// \brief mutex to lock access to fields used in message callbacks
     private: boost::mutex lock;

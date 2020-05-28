@@ -119,6 +119,15 @@ void GazeboRosGroundWire::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf)
   else
     this->wire_config_ = _sdf->GetElement("wireConfig")->Get<std::string>();
 
+  if (!_sdf->HasElement("baseStationPose"))
+  {
+    this->offset_.Set(0., 0., 0., 0., 0., 0.);
+  }
+  else
+  {
+    this->offset_ = _sdf->GetElement("baseStationPose")->Get<ignition::math::Pose3d>();
+  }
+
   // Make sure the ROS node for Gazebo has already been initialized
   if (!ros::isInitialized())
   {
@@ -332,12 +341,20 @@ void GazeboRosGroundWire::getGroundWireArea(std::string file)
     marker.color.g = 1.0;
     marker.color.a = 1.0;
 
+    double yaw_angle = -offset_.Rot().Yaw();
+
     for (const YAML::Node& area : yaml["area"])
     {
       // Get coordinate from yaml
       double x = area["point"]["x"].as<double>();
       double y = area["point"]["y"].as<double>();
       double z = area["point"]["z"].as<double>();
+
+      // However, if the RTK-base-station is rotated, it doesn't align with the world-frame anymore. Therefore add a yaw-rotation to the points
+      double rotatedX = cos(yaw_angle) * (x) - sin(yaw_angle) * (y);
+      double rotatedY = sin(yaw_angle) * (x) + cos(yaw_angle) * (y);
+      x = rotatedX;
+      y = rotatedY;
 
       // Add point to polygon
       struct point2d point;
