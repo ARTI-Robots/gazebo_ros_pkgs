@@ -353,8 +353,6 @@ void GazeboRosGroundWire::getGroundWireArea(std::string file)
       // However, if the RTK-base-station is rotated, it doesn't align with the world-frame anymore. Therefore add a yaw-rotation to the points
       double rotatedX = cos(yaw_angle) * (x) - sin(yaw_angle) * (y);
       double rotatedY = sin(yaw_angle) * (x) + cos(yaw_angle) * (y);
-      x = rotatedX;
-      y = rotatedY;
 
       // Add point to polygon
       struct point2d point;
@@ -363,8 +361,8 @@ void GazeboRosGroundWire::getGroundWireArea(std::string file)
 
       // Add point to visualization marker
       geometry_msgs::Point p;
-      p.x = x;
-      p.y = y;
+      p.x = rotatedX;
+      p.y = rotatedY;
       p.z = z;
       marker.points.push_back(p);
     }
