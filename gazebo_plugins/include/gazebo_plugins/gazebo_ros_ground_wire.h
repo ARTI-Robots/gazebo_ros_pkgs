@@ -53,6 +53,8 @@
 #include <boost/geometry/geometries/polygon.hpp>
 #include <visualization_msgs/Marker.h>
 
+#include <std_msgs/Float64.h>
+
 namespace gazebo
 {
   using Coordinate = double;
@@ -88,8 +90,14 @@ namespace gazebo
     //private: ros::Publisher pub_;
     private: ros::Publisher pub_inside_wire_;
     private: PubQueue<std_msgs::Bool>::Ptr pub_queue_inside_;
-    private: ros::Publisher pub_wire_area_;
-    private: PubQueue<visualization_msgs::Marker>::Ptr pub_queue_marker_;
+    private: ros::Publisher pub_wire_marker_area_;
+    private: PubQueue<visualization_msgs::Marker>::Ptr pub_queue_marker_area_;
+    private: ros::Publisher pub_wire_dist_;
+    private: PubQueue<std_msgs::Float64>::Ptr pub_queue_dist_;
+    private: ros::Publisher pub_wire_angle_;
+    private: PubQueue<std_msgs::Float64>::Ptr pub_queue_angle_;
+    private: ros::Publisher pub_wire_marker_angle_;
+    private: PubQueue<visualization_msgs::Marker>::Ptr pub_queue_marker_angle_;
 
     /// \brief ros message
     private: nav_msgs::Odometry pose_msg_;
@@ -99,8 +107,7 @@ namespace gazebo
     private: std::string link_name_;
 
     /// \brief topic name
-    private: std::string topic_name_;
-    private: std::string visualize_topic_name_;
+    private: std::string topic_namespace_;
 
     /// \brief frame transform name, should match link name
     /// FIXME: extract link name directly?
@@ -159,6 +166,8 @@ namespace gazebo
     private: std::string wire_config_;
     private: void getGroundWireArea(std::string file);
     //void calculateAreaIssue(double pos_x, double pos_y, bool *gps_available, double *add_noise);
+
+    double getGroundWireDistance(ignition::math::Pose3d pose, double *centerPointX, double *centerPointY);
   };
 }
 #endif

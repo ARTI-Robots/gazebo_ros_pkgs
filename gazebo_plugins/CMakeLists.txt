@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(gazebo_plugins)
 
+add_compile_options(-std=c++14)
+
 option(ENABLE_DISPLAY_TESTS "Enable the building of tests that requires a display" OFF)
 
 find_package(catkin REQUIRED COMPONENTS 

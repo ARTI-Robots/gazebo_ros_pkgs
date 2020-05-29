@@ -23,6 +23,8 @@
 
 #include <yaml-cpp/yaml.h>
 
+#include <boost/geometry/geometries/segment.hpp>
+
 namespace gazebo
 {
 GZ_REGISTER_MODEL_PLUGIN(GazeboRosGroundWire);
@@ -77,22 +79,13 @@ void GazeboRosGroundWire::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf)
     return;
   }
 
-  if (!_sdf->HasElement("topicName"))
+  if (!_sdf->HasElement("topicNamespace"))
   {
-    ROS_FATAL_NAMED("ground_wire", "gazebo_ros_ground_wire plugin missing <topicName>, cannot proceed");
+    ROS_FATAL_NAMED("ground_wire", "gazebo_ros_ground_wire plugin missing <topicNamespace>, cannot proceed");
     return;
   }
   else
-    this->topic_name_ = _sdf->GetElement("topicName")->Get<std::string>();
-
-  if (!_sdf->HasElement("visualizeTopicName"))
-  {
-    ROS_DEBUG_NAMED("ground_wire", "gazebo_ros_ground_wire plugin missing <visualizeTopicName>, defaults to /wire_sensor/area");
-    this->visualize_topic_name_ = "/wire_sensor/area";
-  }
-  else
-    this->visualize_topic_name_ = _sdf->GetElement("visualizetopicName")->Get<std::string>();
-
+    this->topic_namespace_ = _sdf->GetElement("topicNamespace")->Get<std::string>();
 
   if (!_sdf->HasElement("frameName"))
   {
@@ -146,17 +139,24 @@ void GazeboRosGroundWire::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf)
   this->rosnode_->getParam(std::string("tf_prefix"), prefix);
   this->tf_frame_name_ = tf::resolve(prefix, this->frame_name_);
 
-  if (this->topic_name_ != "")
+  if (this->topic_namespace_ != "")
   {
-    this->pub_inside_wire_ = this->rosnode_->advertise<std_msgs::Bool>(this->topic_name_, 10);
+    this->pub_inside_wire_ = this->rosnode_->advertise<std_msgs::Bool>(this->topic_namespace_ + "/state", 10);
     this->pub_queue_inside_ = this->pmq.addPub<std_msgs::Bool>();
+
+    this->pub_wire_dist_ = this->rosnode_->advertise<std_msgs::Float64>(this->topic_namespace_+"/dist", 10);
+    this->pub_queue_dist_ = this->pmq.addPub<std_msgs::Float64>();
+
+    this->pub_wire_angle_ = this->rosnode_->advertise<std_msgs::Float64>(this->topic_namespace_+"/angle", 10);
+    this->pub_queue_angle_ = this->pmq.addPub<std_msgs::Float64>();
+
+    this->pub_wire_marker_area_ = this->rosnode_->advertise<visualization_msgs::Marker>(this->topic_namespace_ + "/marker/area", 10, true);
+    this->pub_queue_marker_area_ = this->pmq.addPub<visualization_msgs::Marker>();
+
+    this->pub_wire_marker_angle_ = this->rosnode_->advertise<visualization_msgs::Marker>(this->topic_namespace_ + "/marker/angle", 10, true);
+    this->pub_queue_marker_angle_ = this->pmq.addPub<visualization_msgs::Marker>();
   }
 
-  if (this->visualize_topic_name_ != "")
-  {
-    this->pub_wire_area_ = this->rosnode_->advertise<visualization_msgs::Marker>(this->visualize_topic_name_, 10, true);
-    this->pub_queue_marker_ = this->pmq.addPub<visualization_msgs::Marker>();
-  }
 
 #if GAZEBO_MAJOR_VERSION >= 8
   this->last_time_ = this->world_->SimTime();
@@ -244,7 +244,7 @@ void GazeboRosGroundWire::UpdateChild()
       (cur_time-this->last_time_).Double() < (1.0/this->update_rate_))
     return;
 
-  if (this->pub_inside_wire_.getNumSubscribers() > 0 || this->pub_wire_area_.getNumSubscribers() > 0)
+  if (this->pub_inside_wire_.getNumSubscribers() > 0 || this->pub_wire_marker_area_.getNumSubscribers() > 0)
   {
     // differentiate to get accelerations
     double tmp_dt = cur_time.Double() - this->last_time_.Double();
@@ -252,7 +252,7 @@ void GazeboRosGroundWire::UpdateChild()
     {
       this->lock.lock();
 
-      if (this->topic_name_ != "")
+      if (this->topic_namespace_ != "")
       {
         ignition::math::Pose3d pose, frame_pose;
 
@@ -284,15 +284,19 @@ void GazeboRosGroundWire::UpdateChild()
         // Set state in inside-wire-area-message
         inside_wire_msg_.data = pointInside;
 
-        //ROS_INFO_STREAM("#######################################################");
-        //ROS_INFO_STREAM("################ inside = " << pointInside);
-        //ROS_INFO_STREAM("################ point(x,y) = " << pose.Pos().X() << " | " << pose.Pos().Y());
-
         // Publish inside-wire-area-message
         if (pub_inside_wire_ && (pub_inside_wire_.getNumSubscribers() > 0))
         {
           pub_queue_inside_->push(inside_wire_msg_, pub_inside_wire_);
         }
+
+        double centerPointX = 0.0;
+        double centerPointY = 0.0;
+        double dist = getGroundWireDistance(pose, &centerPointX, &centerPointY);
+
+        std_msgs::Float64 dist_msg;
+        dist_msg.data = dist;
+        pub_queue_dist_->push(dist_msg, pub_wire_dist_);
       }
 
       this->lock.unlock();
@@ -373,12 +377,10 @@ void GazeboRosGroundWire::getGroundWireArea(std::string file)
     // Correct the polygon (for example if the closing point has been forgotten or the order of points is not clockwise):
     boost::geometry::correct(this->wire_polygon_);
 
-    //ROS_ERROR_STREAM("Got wire: " << boost::geometry::wkt(this->wire_polygon_));
-
     // Publish the wire-area visualization marker (latched topic)
-    if (pub_wire_area_)
+    if (pub_wire_marker_area_)
     {
-      pub_queue_marker_->push(marker, pub_wire_area_);
+      pub_queue_marker_area_->push(marker, pub_wire_marker_area_);
     }
   }
   catch (YAML::BadFile&)
@@ -389,6 +391,100 @@ void GazeboRosGroundWire::getGroundWireArea(std::string file)
   {
     ROS_ERROR_STREAM("Ground-wire-config file can not be parsed: " << ex.what());
   }
+}
+
+double GazeboRosGroundWire::getGroundWireDistance(ignition::math::Pose3d pose, double *centerPointX, double *centerPointY)
+{
+  const Point pt(pose.Pos().X(), pose.Pos().Y());
+  auto distance = std::numeric_limits<float>::max();
+
+  if(boost::geometry::within(pt, this->wire_polygon_)) {
+    boost::geometry::for_each_segment(this->wire_polygon_, [&distance, &pt, centerPointX, centerPointY](const auto& segment) {
+      double d=distance;
+      distance = std::min<float>(distance, boost::geometry::distance(segment, pt));
+
+      if(distance < d)
+      {
+        //ROS_ERROR_STREAM("seg1.x: " << segment.first.x());
+        //ROS_ERROR_STREAM("seg1.y: " << segment.first.y());
+        //ROS_ERROR_STREAM("seg2.x: " << segment.second.x());
+        //ROS_ERROR_STREAM("seg2.y: " << segment.second.y());
+
+        double x1 = segment.first.x();
+        double y1 = segment.first.y();
+        double x2 = segment.second.x();
+        double y2 = segment.second.y();
+
+        double dx = x2 - x1;
+        double dy = y2 - y1;
+        double d2 = dx*dx + dy*dy;
+        double nx = ((pt.x()-x1)*dx + (pt.y()-y1)*dy) / d2;
+        *centerPointX = dx*nx + x1;
+        *centerPointY = dy*nx + y1;
+
+        //ROS_ERROR_STREAM("Current point: (" << pt.x() << ", " << pt.y() << ")");
+        //ROS_ERROR_STREAM("Closest point: (" << *centerPointX << ", " << *centerPointY << ")");
+      }
+
+    });
+  } else {
+    distance = boost::geometry::distance(pt, this->wire_polygon_);
+  }
+
+  double robot_direction = pose.Rot().Yaw();
+  const Point vRobot(cos(robot_direction), sin(robot_direction));
+  const Point vWire(*centerPointX - pt.x(), *centerPointY - pt.y());
+
+  double dot = vRobot.x()*vWire.x() + vRobot.y()*vWire.y();
+  double det = vRobot.x()*vWire.y() - vRobot.y()*vWire.x();
+  double angle = atan2(det, dot);
+
+  //ROS_ERROR_STREAM("  ANGLE: " << angle * 180.0 / ( M_PI) );
+
+  if (this->pub_wire_angle_.getNumSubscribers() > 0 || this->pub_wire_marker_angle_.getNumSubscribers() > 0)
+  {
+    double offset_angle = -offset_.Rot().Yaw();
+
+    std_msgs::Float64 msgAngle;
+    msgAngle.data = angle;
+    if (pub_wire_angle_)
+    {
+      pub_queue_angle_->push(msgAngle, pub_wire_angle_);
+    }
+
+    if (pub_wire_marker_angle_)
+    {
+      // Create visualization marker for wire angle
+      visualization_msgs::Marker marker;
+      marker.header.frame_id = "world";
+      marker.header.stamp = ros::Time();
+      marker.ns = "wire_angle";
+      marker.id = 0;
+      marker.type = visualization_msgs::Marker::ARROW;
+      marker.action = visualization_msgs::Marker::ADD;
+      marker.color.b = 1.0;
+      marker.color.g = 0.1;
+      marker.color.a = 1.0;
+      marker.scale.x = 0.02;
+      marker.scale.y = 0.045;
+      marker.scale.z = 0.15;
+
+      // However, if the RTK-base-station is rotated, it doesn't align with the world-frame anymore. Therefore add a yaw-rotation to the points
+      geometry_msgs::Point p1;
+      p1.x = cos(offset_angle) * (pose.Pos().X()) - sin(offset_angle) * (pose.Pos().Y());  // pose.Pos().X()
+      p1.y = sin(offset_angle) * (pose.Pos().X()) + cos(offset_angle) * (pose.Pos().Y());  // pose.Pos().Y()
+      p1.z = pose.Pos().Z();
+      marker.points.push_back(p1);
+      geometry_msgs::Point p2;
+      p2.x = cos(offset_angle) * (*centerPointX) - sin(offset_angle) * (*centerPointY);  // *centerPointX
+      p2.y = sin(offset_angle) * (*centerPointX) + cos(offset_angle) * (*centerPointY);  // *centerPointY
+      p2.z = pose.Pos().Z();
+      marker.points.push_back(p2);
+      pub_queue_marker_angle_->push(marker, pub_wire_marker_angle_);
+    }
+  }
+
+  return distance;
 }
 
 }
