@@ -54,6 +54,8 @@
 #include <visualization_msgs/Marker.h>
 
 #include <std_msgs/Float64.h>
+#include <tf2_ros/transform_listener.h>
+#include <geometry_msgs/TransformStamped.h>
 
 namespace gazebo
 {
@@ -98,6 +100,9 @@ namespace gazebo
     private: PubQueue<std_msgs::Float64>::Ptr pub_queue_angle_;
     private: ros::Publisher pub_wire_marker_angle_;
     private: PubQueue<visualization_msgs::Marker>::Ptr pub_queue_marker_angle_;
+    private: tf2_ros::Buffer tf_buffer_;
+    private: tf2_ros::TransformListener tf_listener_;
+    private: ignition::math::Pose3d wire_sensor_pose_;
 
     /// \brief ros message
     private: nav_msgs::Odometry pose_msg_;
@@ -113,6 +118,7 @@ namespace gazebo
     /// FIXME: extract link name directly?
     private: std::string frame_name_;
     private: std::string tf_frame_name_;
+    private: std::string sensor_frame_name_;
 
     /// \brief RTK base position offset from the gazebo coordinates (ground wire coordinates should be in RTK frame)
     private: ignition::math::Pose3d offset_;
@@ -165,9 +171,9 @@ namespace gazebo
     /// \brief topic name
     private: std::string wire_config_;
     private: void getGroundWireArea(std::string file);
-    //void calculateAreaIssue(double pos_x, double pos_y, bool *gps_available, double *add_noise);
+    private: double getGroundWireDistance(ignition::math::Pose3d pose, double *centerPointX, double *centerPointY);
+    private: void getSensorFrameTransform();
 
-    double getGroundWireDistance(ignition::math::Pose3d pose, double *centerPointX, double *centerPointY);
   };
 }
 #endif

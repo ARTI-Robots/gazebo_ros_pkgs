@@ -25,13 +25,15 @@
 
 #include <boost/geometry/geometries/segment.hpp>
 
+#include "gazebo/physics/PhysicsTypes.hh"
+
 namespace gazebo
 {
 GZ_REGISTER_MODEL_PLUGIN(GazeboRosGroundWire);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Constructor
-GazeboRosGroundWire::GazeboRosGroundWire()
+GazeboRosGroundWire::GazeboRosGroundWire(): tf_listener_(tf_buffer_)
 {
   this->seed = 0;
 }
@@ -70,6 +72,17 @@ void GazeboRosGroundWire::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf)
   }
   else
     this->link_name_ = _sdf->GetElement("bodyName")->Get<std::string>();
+
+  if (!_sdf->HasElement("sensorFrame"))
+  {
+    ROS_FATAL_NAMED("ground_wire", "gazebo_ros_ground_wire plugin missing <sensor_frame_name_>, cannot proceed");
+    return;
+  }
+  else
+    this->sensor_frame_name_ = _sdf->GetElement("sensorFrame")->Get<std::string>();
+
+  ROS_ERROR_STREAM("sensorFrame: " << this->sensor_frame_name_);
+  ROS_ERROR_STREAM("bodyName: " << this->link_name_);
 
   this->link_ = _parent->GetLink(this->link_name_);
   if (!this->link_)
@@ -194,6 +207,7 @@ void GazeboRosGroundWire::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf)
   if (this->reference_link_)
   {
     ROS_DEBUG_NAMED("ground_wire", "got body %s", this->reference_link_->GetName().c_str());
+    ROS_ERROR("MICHAEL_DEBUG got body %s", this->reference_link_->GetName().c_str());
     this->frame_apos_ = 0;
     this->frame_aeul_ = 0;
 #if GAZEBO_MAJOR_VERSION >= 8
@@ -235,8 +249,8 @@ void GazeboRosGroundWire::UpdateChild()
 
   if (cur_time < this->last_time_)
   {
-      ROS_WARN_NAMED("ground_wire", "Negative update time difference detected.");
-      this->last_time_ = cur_time;
+    ROS_WARN_NAMED("ground_wire", "Negative update time difference detected.");
+    this->last_time_ = cur_time;
   }
 
   // rate control
@@ -277,8 +291,30 @@ void GazeboRosGroundWire::UpdateChild()
           pose.Rot() *= frame_pose.Rot().Inverse();
         }
 
+        // In case the sensor-frame is not the same as the Gazebo-model-frame
+        if(this->sensor_frame_name_ != this->link_->GetName().c_str())
+        {
+          getSensorFrameTransform();
+          ignition::math::Pose3d rot = this->wire_sensor_pose_.RotatePositionAboutOrigin(pose.Rot().Inverse());
+          pose.Set(pose.Pos() + rot.Pos(), pose.Rot());
+        }
+
         // Get current position in point
         Point point(pose.Pos().X(), pose.Pos().Y());
+
+        // In case the sensor-frame is not the same as the model-frame
+        if(this->sensor_frame_name_ != this->link_->GetName().c_str())
+        {
+          // Get current position of the model-frame plus the sensor-offset
+          getSensorFrameTransform();
+          Point point(pose.Pos().X() + this->wire_sensor_pose_.Pos().X(), pose.Pos().Y() + this->wire_sensor_pose_.Pos().Y());
+        }
+        else
+        {
+          // Get current position in point
+          Point point(pose.Pos().X(), pose.Pos().Y());
+        }
+
         // Check if point is inside polygon
         bool pointInside = boost::geometry::within(point, this->wire_polygon_);
         // Set state in inside-wire-area-message
@@ -496,5 +532,22 @@ double GazeboRosGroundWire::getGroundWireDistance(ignition::math::Pose3d pose, d
     }
   }
   return distance;
+}
+
+void GazeboRosGroundWire::getSensorFrameTransform()
+{
+  try{
+    geometry_msgs::TransformStamped trans = tf_buffer_.lookupTransform(this->link_->GetName().c_str(), this->sensor_frame_name_, ros::Time(0));
+
+    tf::Quaternion quat;
+    tf::quaternionMsgToTF(trans.transform.rotation, quat);
+    double roll, pitch, yaw;
+    tf::Matrix3x3(quat).getRPY(roll, pitch, yaw);
+
+    wire_sensor_pose_.Set(trans.transform.translation.x, trans.transform.translation.y, trans.transform.translation.z, roll, pitch, yaw);
+  }
+  catch (tf2::TransformException &ex) {
+    ROS_ERROR("%s",ex.what());
+  }
 }
 }
