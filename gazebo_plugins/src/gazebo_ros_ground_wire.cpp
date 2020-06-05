@@ -81,9 +81,6 @@ void GazeboRosGroundWire::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf)
   else
     this->sensor_frame_name_ = _sdf->GetElement("sensorFrame")->Get<std::string>();
 
-  ROS_ERROR_STREAM("sensorFrame: " << this->sensor_frame_name_);
-  ROS_ERROR_STREAM("bodyName: " << this->link_name_);
-
   this->link_ = _parent->GetLink(this->link_name_);
   if (!this->link_)
   {
