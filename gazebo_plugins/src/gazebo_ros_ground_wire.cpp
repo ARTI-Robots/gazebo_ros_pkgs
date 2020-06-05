@@ -398,38 +398,52 @@ double GazeboRosGroundWire::getGroundWireDistance(ignition::math::Pose3d pose, d
   const Point pt(pose.Pos().X(), pose.Pos().Y());
   auto distance = std::numeric_limits<float>::max();
 
-  if(boost::geometry::within(pt, this->wire_polygon_)) {
-    boost::geometry::for_each_segment(this->wire_polygon_, [&distance, &pt, centerPointX, centerPointY](const auto& segment) {
-      double d=distance;
-      distance = std::min<float>(distance, boost::geometry::distance(segment, pt));
+  boost::geometry::for_each_segment(this->wire_polygon_, [&distance, &pt, centerPointX, centerPointY](const auto& segment) {
+    double d=distance;
+    distance = std::min<float>(distance, boost::geometry::distance(segment, pt));
 
-      if(distance < d)
+    if(distance < d)
+    {
+      // Get the segment edge points of the nearest segment
+      double x1 = segment.first.x();
+      double y1 = segment.first.y();
+      double x2 = segment.second.x();
+      double y2 = segment.second.y();
+
+      // Calculate the nearest point of the segment to the robot
+      double a = pt.x() - x1;
+      double b = pt.y() - y1;
+      double c = x2 - x1;
+      double d = y2 - y1;
+
+      double dot = a * c + b * d;
+      double len_sq = c * c + d * d;
+      double param = -1;
+      if (len_sq != 0)  // If the length is zer0
       {
-        //ROS_ERROR_STREAM("seg1.x: " << segment.first.x());
-        //ROS_ERROR_STREAM("seg1.y: " << segment.first.y());
-        //ROS_ERROR_STREAM("seg2.x: " << segment.second.x());
-        //ROS_ERROR_STREAM("seg2.y: " << segment.second.y());
-
-        double x1 = segment.first.x();
-        double y1 = segment.first.y();
-        double x2 = segment.second.x();
-        double y2 = segment.second.y();
-
-        double dx = x2 - x1;
-        double dy = y2 - y1;
-        double d2 = dx*dx + dy*dy;
-        double nx = ((pt.x()-x1)*dx + (pt.y()-y1)*dy) / d2;
-        *centerPointX = dx*nx + x1;
-        *centerPointY = dy*nx + y1;
-
-        //ROS_ERROR_STREAM("Current point: (" << pt.x() << ", " << pt.y() << ")");
-        //ROS_ERROR_STREAM("Closest point: (" << *centerPointX << ", " << *centerPointY << ")");
+        param = dot / len_sq;
       }
 
-    });
-  } else {
-    distance = boost::geometry::distance(pt, this->wire_polygon_);
-  }
+      if (param < 0)
+      {
+        // Nearest point is not on the segment, therefore use the nearest edge point
+        *centerPointX = x1;
+        *centerPointY = y1;
+      }
+      else if (param > 1)
+      {
+        // Nearest point is not on the segment, therefore use the nearest edge point
+        *centerPointX = x2;
+        *centerPointY = y2;
+      }
+      else
+      {
+        // Nearest point is on the segment
+        *centerPointX = x1 + param * c;
+        *centerPointY = y1 + param * d;
+      }
+    }
+  });
 
   double robot_direction = pose.Rot().Yaw();
   const Point vRobot(cos(robot_direction), sin(robot_direction));
@@ -438,8 +452,6 @@ double GazeboRosGroundWire::getGroundWireDistance(ignition::math::Pose3d pose, d
   double dot = vRobot.x()*vWire.x() + vRobot.y()*vWire.y();
   double det = vRobot.x()*vWire.y() - vRobot.y()*vWire.x();
   double angle = atan2(det, dot);
-
-  //ROS_ERROR_STREAM("  ANGLE: " << angle * 180.0 / ( M_PI) );
 
   if (this->pub_wire_angle_.getNumSubscribers() > 0 || this->pub_wire_marker_angle_.getNumSubscribers() > 0)
   {
@@ -483,8 +495,6 @@ double GazeboRosGroundWire::getGroundWireDistance(ignition::math::Pose3d pose, d
       pub_queue_marker_angle_->push(marker, pub_wire_marker_angle_);
     }
   }
-
   return distance;
 }
-
 }
