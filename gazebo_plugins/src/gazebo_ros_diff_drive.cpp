@@ -350,8 +350,8 @@ void GazeboRosDiffDrive::UpdateChild()
 #endif
 
         double sin_noise[2];
-        sin_noise[LEFT] = current_speed[LEFT] > 0.01 ? std::sin(joint_positions[LEFT] / M_PI / sin_noise_period_) * sin_noise_scaling_ : 0.;
-        sin_noise[RIGHT] = current_speed[RIGHT] > 0.01 ? std::sin(joint_positions[RIGHT] / M_PI / sin_noise_period_) * sin_noise_scaling_ : 0.;
+        sin_noise[LEFT] = abs(current_speed[LEFT]) > 0.01 ? std::sin(joint_positions[LEFT] / M_PI / sin_noise_period_) * sin_noise_scaling_ : 0.;
+        sin_noise[RIGHT] = abs(current_speed[RIGHT]) > 0.01 ? std::sin(joint_positions[RIGHT] / M_PI / sin_noise_period_) * sin_noise_scaling_ : 0.;
 
         wheel_speed_instr_[LEFT] = current_speed[LEFT] + sin_noise[LEFT] + (speed_difference[LEFT] + (acceleration_difference[LEFT] * acceleration_difference_blending_ + (1. - acceleration_difference_blending_) * last_acceleration_difference_[LEFT])) * speed_difference_blending_;// + last_wheel_speed_difference_[LEFT] * (1. - speed_difference_blending_);
         wheel_speed_instr_[RIGHT] = current_speed[RIGHT] + sin_noise[RIGHT] + (speed_difference[RIGHT] + (acceleration_difference[RIGHT] * acceleration_difference_blending_ + (1. - acceleration_difference_blending_) * last_acceleration_difference_[RIGHT])) * speed_difference_blending_;// + last_wheel_speed_difference_[RIGHT] * (1. - speed_difference_blending_);
