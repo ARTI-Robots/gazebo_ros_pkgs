@@ -57,6 +57,8 @@
 #include <tf2_ros/transform_listener.h>
 #include <geometry_msgs/TransformStamped.h>
 
+#include <gazebo_msgs/WireSensorState.h>
+
 namespace gazebo
 {
   using Coordinate = double;
@@ -103,6 +105,11 @@ namespace gazebo
     private: tf2_ros::Buffer tf_buffer_;
     private: tf2_ros::TransformListener tf_listener_;
     private: ignition::math::Pose3d wire_sensor_pose_;
+    private: ignition::math::Pose3d wire_sensor_left_pose_;
+    private: ignition::math::Pose3d wire_sensor_right_pose_;
+    private: double max_sensor_dist_;
+    private: PubQueue<gazebo_msgs::WireSensorState>::Ptr pub_queue_wire_msg_;
+    private: ros::Publisher pub_wire_msg_;
 
     /// \brief ros message
     private: nav_msgs::Odometry pose_msg_;
@@ -119,6 +126,8 @@ namespace gazebo
     private: std::string frame_name_;
     private: std::string tf_frame_name_;
     private: std::string sensor_frame_name_;
+    private: std::string sensor_frame_left_name_;
+    private: std::string sensor_frame_right_name_;
 
     /// \brief RTK base position offset from the gazebo coordinates (ground wire coordinates should be in RTK frame)
     private: ignition::math::Pose3d offset_;

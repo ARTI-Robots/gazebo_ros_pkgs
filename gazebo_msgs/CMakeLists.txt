@@ -22,6 +22,7 @@ add_message_files(
   ODEJointProperties.msg
   ODEPhysics.msg
   WorldState.msg
+  WireSensorState.msg
   )
 
 add_service_files(DIRECTORY srv FILES

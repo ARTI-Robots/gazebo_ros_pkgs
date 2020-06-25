@@ -75,11 +75,35 @@ void GazeboRosGroundWire::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf)
 
   if (!_sdf->HasElement("sensorFrame"))
   {
-    ROS_FATAL_NAMED("ground_wire", "gazebo_ros_ground_wire plugin missing <sensor_frame_name_>, cannot proceed");
+    ROS_FATAL_NAMED("ground_wire", "gazebo_ros_ground_wire plugin missing <sensorFrame>, cannot proceed");
     return;
   }
   else
     this->sensor_frame_name_ = _sdf->GetElement("sensorFrame")->Get<std::string>();
+
+  if (!_sdf->HasElement("sensorFrameLeft"))
+  {
+    ROS_FATAL_NAMED("ground_wire", "gazebo_ros_ground_wire plugin missing <sensorFrameLeft>, cannot proceed");
+    return;
+  }
+  else
+    this->sensor_frame_left_name_ = _sdf->GetElement("sensorFrameLeft")->Get<std::string>();
+
+  if (!_sdf->HasElement("sensorFrameRight"))
+  {
+    ROS_FATAL_NAMED("ground_wire", "gazebo_ros_ground_wire plugin missing <sensorFrameRight>, cannot proceed");
+    return;
+  }
+  else
+    this->sensor_frame_right_name_ = _sdf->GetElement("sensorFrameRight")->Get<std::string>();
+
+  if (!_sdf->HasElement("maxSensorDist"))
+  {
+    ROS_FATAL_NAMED("ground_wire", "gazebo_ros_ground_wire plugin missing <maxSensorDist>, cannot proceed");
+    return;
+  }
+  else
+    this->max_sensor_dist_ = _sdf->GetElement("maxSensorDist")->Get<double>();
 
   this->link_ = _parent->GetLink(this->link_name_);
   if (!this->link_)
@@ -165,6 +189,9 @@ void GazeboRosGroundWire::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf)
 
     this->pub_wire_marker_angle_ = this->rosnode_->advertise<visualization_msgs::Marker>(this->topic_namespace_ + "/marker/angle", 10, true);
     this->pub_queue_marker_angle_ = this->pmq.addPub<visualization_msgs::Marker>();
+
+    this->pub_wire_msg_ = this->rosnode_->advertise<gazebo_msgs::WireSensorState>(this->topic_namespace_ + "/raw", 10, true);
+    this->pub_queue_wire_msg_ = this->pmq.addPub<gazebo_msgs::WireSensorState>();
   }
 
 
@@ -216,6 +243,10 @@ void GazeboRosGroundWire::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf)
 #endif
   }
 
+  // Just to be on the safe side, initialize the wire_sensor_poses with zeros
+  wire_sensor_pose_.Set(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+  wire_sensor_left_pose_.Set(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+  wire_sensor_right_pose_.Set(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
 
   // start custom queue for ground_wire
   this->callback_queue_thread_ = boost::thread(
@@ -255,7 +286,7 @@ void GazeboRosGroundWire::UpdateChild()
       (cur_time-this->last_time_).Double() < (1.0/this->update_rate_))
     return;
 
-  if (this->pub_inside_wire_.getNumSubscribers() > 0 || this->pub_wire_marker_area_.getNumSubscribers() > 0)
+  if (this->pub_inside_wire_.getNumSubscribers() > 0 || this->pub_wire_marker_area_.getNumSubscribers() > 0 || this->pub_wire_msg_.getNumSubscribers() > 0)
   {
     // differentiate to get accelerations
     double tmp_dt = cur_time.Double() - this->last_time_.Double();
@@ -265,7 +296,7 @@ void GazeboRosGroundWire::UpdateChild()
 
       if (this->topic_namespace_ != "")
       {
-        ignition::math::Pose3d pose, frame_pose;
+        ignition::math::Pose3d pose, frame_pose, pose_sensor_left, pose_sensor_right;
 
         // Get Pose/Orientation
 #if GAZEBO_MAJOR_VERSION >= 8
@@ -296,14 +327,26 @@ void GazeboRosGroundWire::UpdateChild()
           pose.Set(pose.Pos() + rot.Pos(), pose.Rot());
         }
 
+        // Transform the left wire-sensor-offset according to the current orientation of the robot
+        ignition::math::Pose3d rotLeft = this->wire_sensor_left_pose_.RotatePositionAboutOrigin(pose.Rot().Inverse());
+        pose_sensor_left.Set(pose.Pos() + rotLeft.Pos(), pose_sensor_left.Rot());
+
+        // Transform the right wire-sensor-offset according to the current orientation of the robot
+        ignition::math::Pose3d rotRight = this->wire_sensor_right_pose_.RotatePositionAboutOrigin(pose.Rot().Inverse());
+        pose_sensor_right.Set(pose.Pos() + rotRight.Pos(), pose_sensor_right.Rot());
+
+
         // Get current position in point
         Point point(pose.Pos().X(), pose.Pos().Y());
+
+        // Get current position of the wire_frame_sensor links
+        getSensorFrameTransform();
 
         // In case the sensor-frame is not the same as the model-frame
         if(this->sensor_frame_name_ != this->link_->GetName().c_str())
         {
           // Get current position of the model-frame plus the sensor-offset
-          getSensorFrameTransform();
+          //getSensorFrameTransform();
           Point point(pose.Pos().X() + this->wire_sensor_pose_.Pos().X(), pose.Pos().Y() + this->wire_sensor_pose_.Pos().Y());
         }
         else
@@ -330,6 +373,52 @@ void GazeboRosGroundWire::UpdateChild()
         std_msgs::Float64 dist_msg;
         dist_msg.data = dist;
         pub_queue_dist_->push(dist_msg, pub_wire_dist_);
+
+        //--------------------------------------------------------------------------------------------------------------
+
+        // Get intensity for left and right wire sensor
+        Point pointLeft(pose_sensor_left.Pos().X(), pose_sensor_left.Pos().Y());
+        Point pointRight(pose_sensor_right.Pos().X(), pose_sensor_right.Pos().Y());
+
+        gazebo_msgs::WireSensorState state;
+        state.header.stamp = ros::Time::now();
+
+        // Check if left sensor is inside polygon
+        state.inside_wire_left = boost::geometry::within(pointLeft, this->wire_polygon_);
+
+        // Calculate intensity for left wire sensor
+        double centerPointLeftX = 0.0;
+        double centerPointLeftY = 0.0;
+        double distLeft = getGroundWireDistance(pose_sensor_left, &centerPointLeftX, &centerPointLeftY);
+
+        if(fabs(distLeft) < fabs(this->max_sensor_dist_))
+        {
+          state.intensity_left = fabs(distLeft) / fabs(this->max_sensor_dist_) * 100.0;
+        }
+        else
+        {
+          state.intensity_left = 0.0;
+        }
+
+        // Check if right sensor is inside polygon
+        state.inside_wire_right = boost::geometry::within(pointRight, this->wire_polygon_);
+
+        // Calculate intensity for right wire sensor
+        double centerPointRightX = 0.0;
+        double centerPointRightY = 0.0;
+        double distRight = getGroundWireDistance(pose_sensor_right, &centerPointRightX, &centerPointRightY);
+
+        if(fabs(distRight) < fabs(this->max_sensor_dist_))
+        {
+          state.intensity_right = fabs(distRight) / fabs(this->max_sensor_dist_) * 100.0;
+        }
+        else
+        {
+          state.intensity_right = 0.0;
+        }
+        
+        this->pub_queue_wire_msg_->push(state, pub_wire_msg_);
+
       }
 
       this->lock.unlock();
@@ -542,6 +631,29 @@ void GazeboRosGroundWire::getSensorFrameTransform()
     tf::Matrix3x3(quat).getRPY(roll, pitch, yaw);
 
     wire_sensor_pose_.Set(trans.transform.translation.x, trans.transform.translation.y, trans.transform.translation.z, roll, pitch, yaw);
+
+    //------------------------------------------------------------------------------------------------------------------
+
+    geometry_msgs::TransformStamped transLeft = tf_buffer_.lookupTransform(this->sensor_frame_name_, this->sensor_frame_left_name_, ros::Time(0));
+
+    tf::Quaternion quatLeft;
+    tf::quaternionMsgToTF(transLeft.transform.rotation, quatLeft);
+    double rollLeft, pitchLeft, yawLeft;
+    tf::Matrix3x3(quatLeft).getRPY(rollLeft, pitchLeft, yawLeft);
+
+    wire_sensor_left_pose_.Set(transLeft.transform.translation.x, transLeft.transform.translation.y, transLeft.transform.translation.z, rollLeft, pitchLeft, yawLeft);
+
+    //------------------------------------------------------------------------------------------------------------------
+
+    geometry_msgs::TransformStamped transRight = tf_buffer_.lookupTransform(this->sensor_frame_name_, this->sensor_frame_right_name_, ros::Time(0));
+
+    tf::Quaternion quatRight;
+    tf::quaternionMsgToTF(transRight.transform.rotation, quatRight);
+    double rollRight, pitchRight, yawRight;
+    tf::Matrix3x3(quatRight).getRPY(rollRight, pitchRight, yawRight);
+
+    wire_sensor_right_pose_.Set(transRight.transform.translation.x, transRight.transform.translation.y, transRight.transform.translation.z, rollRight, pitchRight, yawRight);
+
   }
   catch (tf2::TransformException &ex) {
     ROS_ERROR("%s",ex.what());
