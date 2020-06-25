@@ -393,7 +393,7 @@ void GazeboRosGroundWire::UpdateChild()
 
         if(fabs(distLeft) < fabs(this->max_sensor_dist_))
         {
-          state.intensity_left = fabs(distLeft) / fabs(this->max_sensor_dist_) * 100.0;
+          state.intensity_left = 100 - round(fabs(distLeft) / fabs(this->max_sensor_dist_) * 100.0);
         }
         else
         {
@@ -410,13 +410,13 @@ void GazeboRosGroundWire::UpdateChild()
 
         if(fabs(distRight) < fabs(this->max_sensor_dist_))
         {
-          state.intensity_right = fabs(distRight) / fabs(this->max_sensor_dist_) * 100.0;
+          state.intensity_right = 100 - round(fabs(distRight) / fabs(this->max_sensor_dist_) * 100.0);
         }
         else
         {
           state.intensity_right = 0.0;
         }
-        
+
         this->pub_queue_wire_msg_->push(state, pub_wire_msg_);
 
       }
