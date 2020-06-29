@@ -233,6 +233,7 @@ target_link_libraries(gazebo_ros_rtk_gps ${catkin_LIBRARIES} ${Boost_LIBRARIES} 
 
 add_library(gazebo_ros_ground_wire src/gazebo_ros_ground_wire.cpp)
 target_link_libraries(gazebo_ros_ground_wire ${catkin_LIBRARIES} ${Boost_LIBRARIES} yaml-cpp)
+add_dependencies(gazebo_ros_ground_wire ${catkin_EXPORTED_TARGETS})
 
 add_library(gazebo_ros_imu src/gazebo_ros_imu.cpp)
 target_link_libraries(gazebo_ros_imu ${catkin_LIBRARIES} ${Boost_LIBRARIES})
