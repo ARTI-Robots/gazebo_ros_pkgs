@@ -155,6 +155,15 @@ void GazeboRosGroundWire::Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf)
     this->offset_ = _sdf->GetElement("baseStationPose")->Get<ignition::math::Pose3d>();
   }
 
+  if (!_sdf->HasElement("closeToBaseDistance"))
+  {
+    this->close_to_base_distance_ = 1.;
+  }
+  else
+  {
+    this->close_to_base_distance_ = _sdf->GetElement("closeToBaseDistance")->Get<double>();
+  }
+
   // Make sure the ROS node for Gazebo has already been initialized
   if (!ros::isInitialized())
   {
@@ -400,6 +409,16 @@ void GazeboRosGroundWire::UpdateChild()
           state.intensity_left = 0.0;
         }
 
+        double distanceToBaseLeft = getDistanceToBase(pose_sensor_left);
+        if (fabs(distanceToBaseLeft) < fabs(this->close_to_base_distance_))
+        {
+          state.base_close_left = true;
+        }
+        else
+        {
+          state.base_close_left = false;
+        }
+
         // Check if right sensor is inside polygon
         state.inside_wire_right = boost::geometry::within(pointRight, this->wire_polygon_);
 
@@ -415,6 +434,16 @@ void GazeboRosGroundWire::UpdateChild()
         else
         {
           state.intensity_right = 0.0;
+        }
+
+        double distanceToBaseRight = getDistanceToBase(pose_sensor_right);
+        if (fabs(distanceToBaseRight) < fabs(this->close_to_base_distance_))
+        {
+          state.base_close_right = true;
+        }
+        else
+        {
+          state.base_close_right = false;
         }
 
         this->pub_queue_wire_msg_->push(state, pub_wire_msg_);
@@ -658,5 +687,10 @@ void GazeboRosGroundWire::getSensorFrameTransform()
   catch (tf2::TransformException &ex) {
     ROS_ERROR("%s",ex.what());
   }
+}
+
+double GazeboRosGroundWire::getDistanceToBase(ignition::math::Pose3d pose)
+{
+  return pose.Pos().Distance(this->offset_.Pos());
 }
 }

@@ -131,6 +131,7 @@ namespace gazebo
 
     /// \brief RTK base position offset from the gazebo coordinates (ground wire coordinates should be in RTK frame)
     private: ignition::math::Pose3d offset_;
+    private: double close_to_base_distance_;
 
     /// \brief mutex to lock access to fields used in message callbacks
     private: boost::mutex lock;
@@ -182,6 +183,7 @@ namespace gazebo
     private: void getGroundWireArea(std::string file);
     private: double getGroundWireDistance(ignition::math::Pose3d pose, double *centerPointX, double *centerPointY);
     private: void getSensorFrameTransform();
+    private: double getDistanceToBase(ignition::math::Pose3d pose);
 
   };
 }
