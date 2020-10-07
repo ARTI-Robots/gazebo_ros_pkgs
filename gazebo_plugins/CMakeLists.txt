@@ -386,44 +386,44 @@ install(DIRECTORY test
 # Tests
 # These need to be run with -j1 flag because gazebo can't be run
 # in parallel.
-if (CATKIN_ENABLE_TESTING)
-  find_package(rostest REQUIRED)
-
-  add_rostest_gtest(set_model_state-test
-                    test/set_model_state_test/set_model_state_test.test
-                    test/set_model_state_test/set_model_state_test.cpp)
-  target_link_libraries(set_model_state-test ${catkin_LIBRARIES})
-
-  add_rostest(test/range/range_plugin.test)
-
-  if (ENABLE_DISPLAY_TESTS)
-    add_rostest_gtest(depth_camera-test
-                      test/camera/depth_camera.test
-                      test/camera/depth_camera.cpp)
-    target_link_libraries(depth_camera-test ${catkin_LIBRARIES})
-    add_rostest_gtest(multicamera-test
-                      test/camera/multicamera.test
-                      test/camera/multicamera.cpp)
-    target_link_libraries(multicamera-test ${catkin_LIBRARIES})
-    add_rostest_gtest(camera-test
-                      test/camera/camera.test
-                      test/camera/camera.cpp)
-    target_link_libraries(camera-test ${catkin_LIBRARIES})
-    add_rostest_gtest(camera16bit-test
-                      test/camera/camera16bit.test
-                      test/camera/camera16bit.cpp)
-    target_link_libraries(camera16bit-test ${catkin_LIBRARIES})
-    add_rostest_gtest(distortion_barrel_test
-                      test/camera/distortion_barrel.test
-                      test/camera/distortion_barrel.cpp)
-    target_link_libraries(distortion_barrel_test ${catkin_LIBRARIES})
-    add_rostest_gtest(distortion_pincushion_test
-                      test/camera/distortion_pincushion.test
-                      test/camera/distortion_pincushion.cpp)
-    target_link_libraries(distortion_pincushion_test ${catkin_LIBRARIES})
-    add_rostest_gtest(triggered-camera-test
-                      test/camera/triggered_camera.test
-                      test/camera/triggered_camera.cpp)
-    target_link_libraries(triggered-camera-test ${catkin_LIBRARIES})
-  endif()
-endif()
+#if (CATKIN_ENABLE_TESTING)
+#  find_package(rostest REQUIRED)
+#
+#  add_rostest_gtest(set_model_state-test
+#                    test/set_model_state_test/set_model_state_test.test
+#                    test/set_model_state_test/set_model_state_test.cpp)
+#  target_link_libraries(set_model_state-test ${catkin_LIBRARIES})
+#
+#  add_rostest(test/range/range_plugin.test)
+#
+#  if (ENABLE_DISPLAY_TESTS)
+#    add_rostest_gtest(depth_camera-test
+#                      test/camera/depth_camera.test
+#                      test/camera/depth_camera.cpp)
+#    target_link_libraries(depth_camera-test ${catkin_LIBRARIES})
+#    add_rostest_gtest(multicamera-test
+#                      test/camera/multicamera.test
+#                      test/camera/multicamera.cpp)
+#    target_link_libraries(multicamera-test ${catkin_LIBRARIES})
+#    add_rostest_gtest(camera-test
+#                      test/camera/camera.test
+#                      test/camera/camera.cpp)
+#    target_link_libraries(camera-test ${catkin_LIBRARIES})
+#    add_rostest_gtest(camera16bit-test
+#                      test/camera/camera16bit.test
+#                      test/camera/camera16bit.cpp)
+#    target_link_libraries(camera16bit-test ${catkin_LIBRARIES})
+#    add_rostest_gtest(distortion_barrel_test
+#                      test/camera/distortion_barrel.test
+#                      test/camera/distortion_barrel.cpp)
+#    target_link_libraries(distortion_barrel_test ${catkin_LIBRARIES})
+#    add_rostest_gtest(distortion_pincushion_test
+#                      test/camera/distortion_pincushion.test
+#                      test/camera/distortion_pincushion.cpp)
+#    target_link_libraries(distortion_pincushion_test ${catkin_LIBRARIES})
+#    add_rostest_gtest(triggered-camera-test
+#                      test/camera/triggered_camera.test
+#                      test/camera/triggered_camera.cpp)
+#    target_link_libraries(triggered-camera-test ${catkin_LIBRARIES})
+#  endif()
+#endif()
