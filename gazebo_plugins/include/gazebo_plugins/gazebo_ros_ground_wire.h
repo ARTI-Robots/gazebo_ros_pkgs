@@ -180,6 +180,8 @@ namespace gazebo
 
     /// \brief topic name
     private: std::string wire_config_;
+    private: double left_coil_offset_ = 0.;
+    private: double right_coil_offset_ = -50.;
     private: void getGroundWireArea(std::string file);
     private: double getGroundWireDistance(ignition::math::Pose3d pose, double *centerPointX, double *centerPointY);
     private: void getSensorFrameTransform();
