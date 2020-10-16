@@ -424,12 +424,35 @@ void GazeboRosGroundWire::UpdateChild()
         state.header.stamp = ros::Time::now();
 
         // Check if left sensor is inside polygon
-        state.inside_wire_left = boost::geometry::within(pointLeft, this->wire_polygon_);
+        bool inside_wire_left = boost::geometry::within(pointLeft, this->wire_polygon_);
 
         // Calculate intensity for left wire sensor
         double centerPointLeftX = 0.0;
         double centerPointLeftY = 0.0;
         double distLeft = getGroundWireDistance(pose_sensor_left, &centerPointLeftX, &centerPointLeftY);
+
+        if (inside_wire_left)
+        {
+          if (fabs(distLeft) > 0.02)
+          {
+            state.inside_wire_left = true;
+          }
+          else
+          {
+            state.inside_wire_left = old_wire_state_.inside_wire_left;
+          }
+        }
+        else
+        {
+          if (fabs(distLeft) > 0.05)
+          {
+            state.inside_wire_left = false;
+          }
+          else
+          {
+            state.inside_wire_left = old_wire_state_.inside_wire_left;
+          }
+        }
 
         if (fabs(distLeft) < fabs(this->max_sensor_dist_))
         {
@@ -453,7 +476,7 @@ void GazeboRosGroundWire::UpdateChild()
             state.intensity_left = std::min(lower_distance_cubic_fit, higher_distance_quadratic_fit);
           }
 
-          state.intensity_left += left_coil_offset_;
+          state.intensity_left += left_coil_offset_ + this->GaussianKernel(0, 50);
         }
         else
         {
@@ -471,12 +494,35 @@ void GazeboRosGroundWire::UpdateChild()
         }
 
         // Check if right sensor is inside polygon
-        state.inside_wire_right = boost::geometry::within(pointRight, this->wire_polygon_);
+        bool inside_wire_right  = boost::geometry::within(pointRight, this->wire_polygon_);
 
         // Calculate intensity for right wire sensor
         double centerPointRightX = 0.0;
         double centerPointRightY = 0.0;
         double distRight = getGroundWireDistance(pose_sensor_right, &centerPointRightX, &centerPointRightY);
+
+        if (inside_wire_right)
+        {
+          if (fabs(distRight) > 0.02)
+          {
+            state.inside_wire_right = true;
+          }
+          else
+          {
+            state.inside_wire_right = old_wire_state_.inside_wire_right;
+          }
+        }
+        else
+        {
+          if (fabs(distRight) > 0.05)
+          {
+            state.inside_wire_right = false;
+          }
+          else
+          {
+            state.inside_wire_right = old_wire_state_.inside_wire_right;
+          }
+        }
 
         if (fabs(distRight) < fabs(this->max_sensor_dist_))
         {
@@ -500,7 +546,7 @@ void GazeboRosGroundWire::UpdateChild()
             state.intensity_right = std::min(lower_distance_cubic_fit, higher_distance_quadratic_fit);
           }
 
-          state.intensity_right += right_coil_offset_;
+          state.intensity_right += right_coil_offset_ + this->GaussianKernel(0, 50);
         }
         else
         {
@@ -516,6 +562,8 @@ void GazeboRosGroundWire::UpdateChild()
         {
           state.base_close_right = false;
         }
+
+        old_wire_state_ = state;
 
         this->pub_queue_wire_msg_->push(state, pub_wire_msg_);
 
@@ -776,5 +824,29 @@ void GazeboRosGroundWire::getSensorFrameTransform()
 double GazeboRosGroundWire::getDistanceToBase(ignition::math::Pose3d pose)
 {
   return pose.Pos().Distance(this->offset_.Pos());
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Utility for adding noise
+double GazeboRosGroundWire::GaussianKernel(double mu, double sigma)
+{
+  // using Box-Muller transform to generate two independent standard
+  // normally disbributed normal variables see wikipedia
+
+  // normalized uniform random variable
+  double U = static_cast<double>(rand_r(&this->seed)) /
+             static_cast<double>(RAND_MAX);
+
+  // normalized uniform random variable
+  double V = static_cast<double>(rand_r(&this->seed)) /
+             static_cast<double>(RAND_MAX);
+
+  double X = sqrt(-2.0 * ::log(U)) * cos(2.0*M_PI * V);
+  // double Y = sqrt(-2.0 * ::log(U)) * sin(2.0*M_PI * V);
+
+  // there are 2 indep. vars, we'll just use X
+  // scale to our mu and sigma
+  X = sigma * X + mu;
+  return X;
 }
 }

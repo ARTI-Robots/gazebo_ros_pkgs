@@ -58,6 +58,7 @@
 #include <geometry_msgs/TransformStamped.h>
 
 #include <gazebo_msgs/WireSensorState.h>
+#include <queue>
 
 namespace gazebo
 {
@@ -75,6 +76,7 @@ namespace gazebo
 
     /// \brief Load the controller
     public: void Load(physics::ModelPtr _parent, sdf::ElementPtr _sdf);
+    private: double GaussianKernel(double mu, double sigma);
 
     /// \brief Update the controller
     protected: virtual void UpdateChild();
@@ -110,6 +112,7 @@ namespace gazebo
     private: double max_sensor_dist_;
     private: PubQueue<gazebo_msgs::WireSensorState>::Ptr pub_queue_wire_msg_;
     private: ros::Publisher pub_wire_msg_;
+    private: gazebo_msgs::WireSensorState old_wire_state_;
 
     /// \brief ros message
     private: nav_msgs::Odometry pose_msg_;
