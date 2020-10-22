@@ -482,7 +482,7 @@ void GazeboRosGroundWire::UpdateChild()
         {
           state.intensity_left = 0.0;
         }
-        state.intensity_left = std::max(state.intensity_right, 2800.);
+        state.intensity_left = std::max(state.intensity_right, 2800u);
 
         double distanceToBaseLeft = getDistanceToBase(pose_sensor_left);
         if (fabs(distanceToBaseLeft) < fabs(this->close_to_base_distance_))
@@ -553,7 +553,7 @@ void GazeboRosGroundWire::UpdateChild()
         {
           state.intensity_right = 0.0;
         }
-        state.intensity_right = std::max(state.intensity_right, 2800.);
+        state.intensity_right = std::max(state.intensity_right, 2800u);
 
         double distanceToBaseRight = getDistanceToBase(pose_sensor_right);
         if (fabs(distanceToBaseRight) < fabs(this->close_to_base_distance_))
