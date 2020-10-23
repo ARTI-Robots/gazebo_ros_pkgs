@@ -464,7 +464,7 @@ void GazeboRosGroundWire::UpdateChild()
                                               + 922.925 * std::min(distance_in_cm, 6.) + 585.525;
             double higher_distance_quadratic_fit =
               std::pow(-1.77747 * distance_in_cm, 2.) + 43.1582 * distance_in_cm + 2456.73;
-            state.intensity_left = std::min(lower_distance_cubic_fit, higher_distance_quadratic_fit);
+            state.intensity_left = std::max(0., std::min(lower_distance_cubic_fit, higher_distance_quadratic_fit));
           }
           else
           {
@@ -473,7 +473,7 @@ void GazeboRosGroundWire::UpdateChild()
                                               - 380.078 * std::max(distance_in_cm, -6.) + 486.55;
             double higher_distance_quadratic_fit =
               -2.79371 * std::pow(distance_in_cm, 2.) - 63.5622 * distance_in_cm + 2240.77;
-            state.intensity_left = std::min(lower_distance_cubic_fit, higher_distance_quadratic_fit);
+            state.intensity_left = std::max(0., std::min(lower_distance_cubic_fit, higher_distance_quadratic_fit));
           }
 
           state.intensity_left += left_coil_offset_ + this->GaussianKernel(0, 50);
@@ -535,7 +535,7 @@ void GazeboRosGroundWire::UpdateChild()
                                               + 922.925 * std::min(distance_in_cm, 6.) + 585.525;
             double higher_distance_quadratic_fit =
               std::pow(-1.77747 * distance_in_cm, 2.) + 43.1582 * distance_in_cm + 2456.73;
-            state.intensity_right = std::min(lower_distance_cubic_fit, higher_distance_quadratic_fit);
+            state.intensity_right = std::max(0., std::min(lower_distance_cubic_fit, higher_distance_quadratic_fit));
           }
           else
           {
@@ -544,7 +544,7 @@ void GazeboRosGroundWire::UpdateChild()
                                               - 380.078 * std::max(distance_in_cm, -6.) + 486.55;
             double higher_distance_quadratic_fit =
               -2.79371 * std::pow(distance_in_cm, 2.) - 63.5622 * distance_in_cm + 2240.77;
-            state.intensity_right = std::min(lower_distance_cubic_fit, higher_distance_quadratic_fit);
+            state.intensity_right = std::max(0., std::min(lower_distance_cubic_fit, higher_distance_quadratic_fit));
           }
 
           state.intensity_right += right_coil_offset_ + this->GaussianKernel(0, 50);
