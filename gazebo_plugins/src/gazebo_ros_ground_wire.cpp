@@ -461,10 +461,8 @@ void GazeboRosGroundWire::UpdateChild()
           {
             double lower_distance_quadratic_fit =
               -420. * std::pow(distance_in_cm, 2.) + 3052 * std::abs(distance_in_cm) + 24104;
-            LOG_DEBUG_STREAM("<in>lower_distance_quadratic_fit: " << lower_distance_quadratic_fit);
 
             double higher_distance_linear_fit = std::abs(distance_in_cm) * 16.2667 + 30062.;
-            LOG_DEBUG_STREAM("<in>higher_distance_linear_fit: " << higher_distance_linear_fit);
 
             if (distance_in_cm > 5.)
             {
@@ -483,10 +481,8 @@ void GazeboRosGroundWire::UpdateChild()
           {
             double lower_distance_quadratic_fit =
               -418.5 * std::pow(distance_in_cm, 2.) - 6037.5 * std::abs(distance_in_cm) + 9714;
-            LOG_DEBUG_STREAM("<in>lower_distance_quadratic_fit: " << lower_distance_quadratic_fit);
 
             double higher_distance_linear_fit = std::abs(distance_in_cm) * 16.2667 + 30062.;
-            LOG_DEBUG_STREAM("<in>higher_distance_linear_fit: " << higher_distance_linear_fit);
 
             if (distance_in_cm > 5.)
             {
@@ -558,10 +554,8 @@ void GazeboRosGroundWire::UpdateChild()
           {
             double lower_distance_quadratic_fit =
               -420. * std::pow(distance_in_cm, 2.) + 3052 * std::abs(distance_in_cm) + 24104;
-            LOG_DEBUG_STREAM("<in>lower_distance_quadratic_fit: " << lower_distance_quadratic_fit);
 
             double higher_distance_linear_fit = std::abs(distance_in_cm) * 16.2667 + 30062.;
-            LOG_DEBUG_STREAM("<in>higher_distance_linear_fit: " << higher_distance_linear_fit);
 
             if (distance_in_cm > 5.)
             {
@@ -580,10 +574,8 @@ void GazeboRosGroundWire::UpdateChild()
           {
             double lower_distance_quadratic_fit =
               -418.5 * std::pow(distance_in_cm, 2.) - 6037.5 * std::abs(distance_in_cm) + 9714;
-            LOG_DEBUG_STREAM("<in>lower_distance_quadratic_fit: " << lower_distance_quadratic_fit);
 
             double higher_distance_linear_fit = std::abs(distance_in_cm) * 16.2667 + 30062.;
-            LOG_DEBUG_STREAM("<in>higher_distance_linear_fit: " << higher_distance_linear_fit);
 
             if (distance_in_cm > 5.)
             {
