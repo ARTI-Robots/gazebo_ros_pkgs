@@ -459,21 +459,47 @@ void GazeboRosGroundWire::UpdateChild()
           double distance_in_cm = distLeft * 100.;
           if (state.inside_wire_left)
           {
-            double lower_distance_cubic_fit = 5.91744 * std::pow(std::min(distance_in_cm, 6.), 3.)
-                                              - 130.323 * std::pow(std::min(distance_in_cm, 6.), 2.)
-                                              + 922.925 * std::min(distance_in_cm, 6.) + 585.525;
-            double higher_distance_quadratic_fit =
-              std::pow(-1.77747 * distance_in_cm, 2.) + 43.1582 * distance_in_cm + 2456.73;
-            state.intensity_left = std::max(0., std::min(lower_distance_cubic_fit, higher_distance_quadratic_fit));
+            double lower_distance_quadratic_fit =
+              -420. * std::pow(distance_in_cm, 2.) + 3052 * std::abs(distance_in_cm) + 24104;
+            LOG_DEBUG_STREAM("<in>lower_distance_quadratic_fit: " << lower_distance_quadratic_fit);
+
+            double higher_distance_linear_fit = std::abs(distance_in_cm) * 16.2667 + 30062.;
+            LOG_DEBUG_STREAM("<in>higher_distance_linear_fit: " << higher_distance_linear_fit);
+
+            if (distance_in_cm > 5.)
+            {
+              state.intensity_left = higher_distance_linear_fit;
+            }
+            else if (distance_in_cm < 2.)
+            {
+              state.intensity_left = 20000.;
+            }
+            else
+            {
+              state.intensity_left = lower_distance_quadratic_fit;
+            }
           }
           else
           {
-            double lower_distance_cubic_fit = 7.21212 * std::pow(std::max(distance_in_cm, -6.), 3.)
-                                              + 39.474 * std::pow(std::max(distance_in_cm, -6.), 2.)
-                                              - 380.078 * std::max(distance_in_cm, -6.) + 486.55;
-            double higher_distance_quadratic_fit =
-              -2.79371 * std::pow(distance_in_cm, 2.) - 63.5622 * distance_in_cm + 2240.77;
-            state.intensity_left = std::max(0., std::min(lower_distance_cubic_fit, higher_distance_quadratic_fit));
+            double lower_distance_quadratic_fit =
+              -418.5 * std::pow(distance_in_cm, 2.) - 6037.5 * std::abs(distance_in_cm) + 9714;
+            LOG_DEBUG_STREAM("<in>lower_distance_quadratic_fit: " << lower_distance_quadratic_fit);
+
+            double higher_distance_linear_fit = std::abs(distance_in_cm) * 16.2667 + 30062.;
+            LOG_DEBUG_STREAM("<in>higher_distance_linear_fit: " << higher_distance_linear_fit);
+
+            if (distance_in_cm > 5.)
+            {
+              state.intensity_left = higher_distance_linear_fit;
+            }
+            else if (distance_in_cm < 2.)
+            {
+              state.intensity_left = 20000.;
+            }
+            else
+            {
+              state.intensity_left = lower_distance_quadratic_fit;
+            }
           }
 
           state.intensity_left += left_coil_offset_ + this->GaussianKernel(0, 50);
@@ -530,21 +556,47 @@ void GazeboRosGroundWire::UpdateChild()
           double distance_in_cm = distRight * 100.;
           if (state.inside_wire_right)
           {
-            double lower_distance_cubic_fit = 5.91744 * std::pow(std::min(distance_in_cm, 6.), 3.)
-                                              - 130.323 * std::pow(std::min(distance_in_cm, 6.), 2.)
-                                              + 922.925 * std::min(distance_in_cm, 6.) + 585.525;
-            double higher_distance_quadratic_fit =
-              std::pow(-1.77747 * distance_in_cm, 2.) + 43.1582 * distance_in_cm + 2456.73;
-            state.intensity_right = std::max(0., std::min(lower_distance_cubic_fit, higher_distance_quadratic_fit));
+            double lower_distance_quadratic_fit =
+              -420. * std::pow(distance_in_cm, 2.) + 3052 * std::abs(distance_in_cm) + 24104;
+            LOG_DEBUG_STREAM("<in>lower_distance_quadratic_fit: " << lower_distance_quadratic_fit);
+
+            double higher_distance_linear_fit = std::abs(distance_in_cm) * 16.2667 + 30062.;
+            LOG_DEBUG_STREAM("<in>higher_distance_linear_fit: " << higher_distance_linear_fit);
+
+            if (distance_in_cm > 5.)
+            {
+              state.intensity_right = higher_distance_linear_fit;
+            }
+            else if (distance_in_cm < 2.)
+            {
+              state.intensity_right = 20000.;
+            }
+            else
+            {
+              state.intensity_right = lower_distance_quadratic_fit;
+            }
           }
           else
           {
-            double lower_distance_cubic_fit = 7.21212 * std::pow(std::max(distance_in_cm, -6.), 3.)
-                                              + 39.474 * std::pow(std::max(distance_in_cm, -6.), 2.)
-                                              - 380.078 * std::max(distance_in_cm, -6.) + 486.55;
-            double higher_distance_quadratic_fit =
-              -2.79371 * std::pow(distance_in_cm, 2.) - 63.5622 * distance_in_cm + 2240.77;
-            state.intensity_right = std::max(0., std::min(lower_distance_cubic_fit, higher_distance_quadratic_fit));
+            double lower_distance_quadratic_fit =
+              -418.5 * std::pow(distance_in_cm, 2.) - 6037.5 * std::abs(distance_in_cm) + 9714;
+            LOG_DEBUG_STREAM("<in>lower_distance_quadratic_fit: " << lower_distance_quadratic_fit);
+
+            double higher_distance_linear_fit = std::abs(distance_in_cm) * 16.2667 + 30062.;
+            LOG_DEBUG_STREAM("<in>higher_distance_linear_fit: " << higher_distance_linear_fit);
+
+            if (distance_in_cm > 5.)
+            {
+              state.intensity_right = higher_distance_linear_fit;
+            }
+            else if (distance_in_cm < 2.)
+            {
+              state.intensity_right = 20000.;
+            }
+            else
+            {
+              state.intensity_right = lower_distance_quadratic_fit;
+            }
           }
 
           state.intensity_right += right_coil_offset_ + this->GaussianKernel(0, 50);
